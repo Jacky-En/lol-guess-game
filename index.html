@@ -43,6 +43,11 @@
     .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
     .scoreRow{display:grid;grid-template-columns:42px 1fr 70px 70px;gap:8px;align-items:center;
       padding:10px 0;border-bottom:1px solid var(--line)}
+    .roundScoreRow{grid-template-columns:36px 44px minmax(0,1fr) 58px 58px}
+    .roundHero{width:42px;height:42px;border-radius:10px;object-fit:cover;display:block;
+      background:#080d18;border:1px solid var(--line)}
+    .roundHeroUnknown{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;
+      background:#202a42;border:1px solid var(--line);font-weight:900;color:var(--muted)}
     .scoreRow:last-child{border-bottom:0}.right{text-align:right}
     .mvp{text-align:center;padding:22px 10px}.crown{font-size:52px}.mvpName{font-size:28px;font-weight:900}
     .notice{padding:10px 12px;border-radius:10px;background:#262f45;color:#dce5f8;font-size:13px}
@@ -520,9 +525,13 @@ function render(){
   if(phase==="roundEnd"){
     showView("roundEndView");
     const ps=rankPlayers(activePlayers(g));
-    $("roundScores").innerHTML=ps.map(([id,p],i)=>`
-      <div class="scoreRow">
+    $("roundScores").innerHTML=ps.map(([id,p],i)=>{
+      const hero = p.championId
+        ? `<img class="roundHero" src="${heroUrl(p.championId)}" alt="${esc(p.name)}本轮英雄头像">`
+        : `<div class="roundHeroUnknown" aria-label="英雄未知">?</div>`;
+      return `<div class="scoreRow roundScoreRow">
         <div>${i+1}</div>
+        <div>${hero}</div>
         <div>
           <div class="playerHead">
             <div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
@@ -532,7 +541,8 @@ function render(){
         </div>
         <div class="right">+${p.roundScore||0}</div>
         <div class="right topscore">${p.score||0}</div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
     bindRemoveButtons();
     return;
   }
