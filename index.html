@@ -48,6 +48,13 @@
     .notice{padding:10px 12px;border-radius:10px;background:#262f45;color:#dce5f8;font-size:13px}
     .err{background:#482227;color:#ffd4d4}.small{font-size:12px;color:var(--muted)}
     .topscore{font-weight:800;color:#f5cf78}
+    .gameTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 2px}
+    .gameTopRight{display:flex;align-items:center;gap:8px}
+    .closeGame{width:42px;min-width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;
+      background:#252f48;color:var(--text);border:1px solid var(--line);font-size:24px;line-height:1}
+    .closeGame:hover{background:#3a2940;border-color:#70404a}
+    .exitBox{text-align:center;padding:28px 16px}
+    .exitMark{font-size:42px;margin-bottom:8px}
     @media(min-width:620px){.players{grid-template-columns:repeat(3,minmax(0,1fr))}.heroGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
   </style>
 </head>
@@ -79,9 +86,12 @@
   </section>
 
   <section id="gameView" class="hidden">
-    <div class="row between" style="margin:8px 2px">
+    <div class="gameTop">
       <b>第 <span id="roundNo">1</span> 轮</b>
-      <span class="tag">总分 <span id="myScore">0</span></span>
+      <div class="gameTopRight">
+        <span class="tag">总分 <span id="myScore">0</span></span>
+        <button id="forceExitBtn" class="closeGame" type="button" aria-label="退出本场比赛" title="退出本场比赛">×</button>
+      </div>
     </div>
     <div id="heroGrid" class="heroGrid"></div>
     <div id="myControls" class="card">
@@ -94,6 +104,14 @@
         <div class="small">你的英雄</div>
         <img id="revealImg" alt="你的英雄头像" style="width:120px;height:120px;border-radius:14px;margin-top:8px;object-fit:cover">
       </div>
+    </div>
+  </section>
+
+  <section id="exitView" class="hidden">
+    <div class="card exitBox">
+      <div class="exitMark">×</div>
+      <h2 style="margin:0 0 8px;font-size:20px">已退出本场比赛</h2>
+      <div class="small">你不会再影响本轮进度。可以关闭此页面；下一场比赛开始前重新打开即可再次加入。</div>
     </div>
   </section>
 
@@ -134,8 +152,11 @@ const firebaseConfig = {
 
 const ROOT = "lolGuessGame";
 const $ = id => document.getElementById(id);
-const views = ["joinView","lobbyView","gameView","roundEndView","finalView"];
+const views = ["joinView","lobbyView","gameView","exitView","roundEndView","finalView"];
 let db, gameRef, meId, currentGame = null;
+let disconnectHandle = null;
+let disconnectMode = "";
+let closingRound = false;
 let ddragonVersion = null, champions = [];
 
 function showView(id){
@@ -176,6 +197,70 @@ function allOnlinePlayers(g=currentGame){
 function rankPlayers(entries){
   return [...entries].sort((a,b)=>(b[1].score||0)-(a[1].score||0) || (a[1].joinedAt||0)-(b[1].joinedAt||0));
 }
+
+async function configureDisconnectGuard(g=currentGame){
+  if(!db || !meId) return;
+  const me=g?.players?.[meId];
+  if(!me) return;
+
+  const shouldExitMatch = g?.state?.phase==="playing" && me.inMatch && me.status==="guessing";
+  const mode = shouldExitMatch ? "exitMatch" : "offlineOnly";
+  if(disconnectMode===mode && disconnectHandle) return;
+
+  try{
+    if(disconnectHandle) await disconnectHandle.cancel();
+    disconnectHandle = onDisconnect(ref(db,`${ROOT}/players/${meId}`));
+    if(shouldExitMatch){
+      await disconnectHandle.update({
+        online:false,
+        inMatch:false,
+        status:"left",
+        roundScore:0,
+        finishOrder:null
+      });
+    }else{
+      await disconnectHandle.update({online:false});
+    }
+    disconnectMode=mode;
+  }catch(e){
+    console.warn("onDisconnect 配置失败",e);
+  }
+}
+
+async function maybeCloseRound(g=currentGame){
+  if(closingRound || !gameRef || g?.state?.phase!=="playing") return;
+  const participants=Object.values(g.players||{}).filter(p=>p.inMatch);
+
+  if(participants.length===0){
+    closingRound=true;
+    try{
+      await runTransaction(gameRef,game=>{
+        if(!game || game.state?.phase!=="playing") return game;
+        const live=Object.values(game.players||{}).filter(p=>p.inMatch);
+        if(live.length!==0) return game;
+        game.state={phase:"lobby",round:0,finishCounter:0,participantCount:0};
+        for(const p of Object.values(game.players||{})){
+          p.status="lobby"; p.inMatch=false; p.roundScore=0; p.championId=null; p.finishOrder=null;
+        }
+        return game;
+      });
+    }finally{ closingRound=false; }
+    return;
+  }
+
+  if(participants.every(p=>p.status!=="guessing")){
+    closingRound=true;
+    try{
+      await runTransaction(gameRef,game=>{
+        if(!game || game.state?.phase!=="playing") return game;
+        const live=Object.values(game.players||{}).filter(p=>p.inMatch);
+        if(live.length && live.every(p=>p.status!=="guessing")) game.state.phase="roundEnd";
+        return game;
+      });
+    }finally{ closingRound=false; }
+  }
+}
+
 function render(){
   const g=currentGame;
   if(!g){ showView("joinView"); return; }
@@ -185,6 +270,11 @@ function render(){
     showView("joinView"); return;
   }
   const phase=g.state?.phase||"lobby";
+
+  if(phase!=="lobby" && me.status==="left" && !me.inMatch){
+    showView("exitView");
+    return;
+  }
 
   if(phase==="lobby"){
     showView("lobbyView");
@@ -323,6 +413,41 @@ async function finishMe(kind){
   });
 }
 
+async function forceExitMatch(){
+  await runTransaction(gameRef,game=>{
+    if(!game) return game;
+    const p=game.players?.[meId];
+    if(!p) return game;
+
+    p.online=false;
+    p.inMatch=false;
+    p.status="left";
+    p.roundScore=0;
+    p.finishOrder=null;
+    p.championId=null;
+
+    if(game.state?.phase==="playing"){
+      const remaining=Object.values(game.players||{}).filter(x=>x.inMatch);
+      if(remaining.length===0){
+        game.state={phase:"lobby",round:0,finishCounter:0,participantCount:0};
+        for(const other of Object.values(game.players||{})){
+          other.status="lobby"; other.inMatch=false; other.roundScore=0;
+          other.championId=null; other.finishOrder=null;
+        }
+      }else if(remaining.every(x=>x.status!=="guessing")){
+        game.state.phase="roundEnd";
+      }
+    }
+    return game;
+  });
+
+  try{
+    if(disconnectHandle) await disconnectHandle.cancel();
+  }catch(e){}
+  disconnectHandle=null;
+  disconnectMode="";
+}
+
 /* Firebase boot */
 let initializeApp,getDatabase,ref,onValue,set,update,get,runTransaction,onDisconnect,remove;
 async function boot(){
@@ -338,11 +463,17 @@ async function boot(){
     const app=initializeApp(firebaseConfig); db=getDatabase(app); gameRef=ref(db,ROOT);
     meId=localStorage.getItem("lolGuessPlayerId")||uid();
     localStorage.setItem("lolGuessPlayerId",meId);
-    onValue(gameRef,s=>{currentGame=s.val()||{state:{phase:"lobby"},players:{}};render();});
+    onValue(gameRef,s=>{
+      currentGame=s.val()||{state:{phase:"lobby"},players:{}};
+      render();
+      configureDisconnectGuard(currentGame);
+      maybeCloseRound(currentGame);
+    });
     const existing=await get(ref(db,`${ROOT}/players/${meId}`));
     if(existing.exists()){
       await update(ref(db,`${ROOT}/players/${meId}`),{online:true});
-      onDisconnect(ref(db,`${ROOT}/players/${meId}/online`)).set(false);
+      disconnectMode="";
+      await configureDisconnectGuard(currentGame);
     }
     await loadChampions().catch(()=>{});
   }catch(e){
@@ -359,10 +490,13 @@ $("joinForm").addEventListener("submit",async e=>{
   await set(ref(db,`${ROOT}/players/${meId}`),{
     name:name.slice(0,16),online:true,inMatch:false,score:0,status:"lobby",joinedAt:Date.now()
   });
-  onDisconnect(ref(db,`${ROOT}/players/${meId}/online`)).set(false);
+  disconnectMode="";
+  await configureDisconnectGuard(currentGame);
 });
 $("leaveBtn").addEventListener("click",async()=>{
   if(currentGame?.state?.phase!=="lobby") return;
+  try{ if(disconnectHandle) await disconnectHandle.cancel(); }catch(e){}
+  disconnectHandle=null; disconnectMode="";
   await remove(ref(db,`${ROOT}/players/${meId}`));
   localStorage.removeItem("lolGuessPlayerId");
   meId=uid(); localStorage.setItem("lolGuessPlayerId",meId);
@@ -372,6 +506,11 @@ $("nextRoundBtn").addEventListener("click",()=>assignAndStartRound(false));
 $("guessedBtn").addEventListener("click",()=>finishMe("guessed"));
 $("giveUpBtn").addEventListener("click",()=>{
   if(confirm("确定弃权？弃权后本轮 0 分，并显示你的英雄。")) finishMe("gaveup");
+});
+$("forceExitBtn").addEventListener("click",()=>{
+  if(confirm("确定退出本场比赛？\n\n退出后你将从本场比赛中移除，其他玩家可以继续进行。")){
+    forceExitMatch();
+  }
 });
 $("endGameBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
   if(g?.state?.phase==="roundEnd") g.state.phase="gameEnd"; return g;
