@@ -6,72 +6,687 @@
   <title>LOL 猜英雄</title>
   <style>
     :root{
-      --bg:#0b1020;--panel:#121a2d;--panel2:#18223a;--line:#2a3655;
-      --text:#eef3ff;--muted:#9eabc5;--accent:#c89b3c;--danger:#d95454;--ok:#4fb879;
+      --bg:#07090d;
+      --bg2:#0b0d12;
+      --panel:#0d1118;
+      --panel2:#111722;
+      --panel3:#151c28;
+      --line:#2a303a;
+      --line-soft:#1c222c;
+      --gold:#c89b3c;
+      --gold2:#d9b45d;
+      --gold3:#8d6b2d;
+      --cream:#f0e6d2;
+      --cream2:#cdbf9f;
+      --text:#e7e2d4;
+      --muted:#8d8a82;
+      --muted2:#65645f;
+      --cyan:#0ac8b9;
+      --danger:#a83b45;
+      --danger2:#6d2b32;
+      --ok:#56b88a;
+      --shadow:0 18px 60px rgba(0,0,0,.42);
+      --serif:Georgia,"Times New Roman","Noto Serif SC","Songti SC",serif;
+      --sans:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
     }
+
     *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#09101d,#10182b);color:var(--text);
-      font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
+    html{background:var(--bg)}
+    body{
+      margin:0;
+      min-height:100vh;
+      color:var(--text);
+      font-family:var(--sans);
+      background:
+        radial-gradient(circle at 50% 0%,rgba(48,57,75,.22),transparent 36%),
+        radial-gradient(circle at 50% 100%,rgba(75,54,24,.10),transparent 40%),
+        linear-gradient(180deg,#07090d 0%,#0a0d13 55%,#07090d 100%);
+      overflow-x:hidden;
+    }
+
+    /* Slow decorative ring: visually similar to a game client backdrop, but CSS-only. */
+    body::before{
+      content:"";
+      position:fixed;
+      z-index:-2;
+      left:50%;
+      top:50%;
+      width:min(1120px,94vmin);
+      aspect-ratio:1/1;
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      opacity:.18;
+      background:
+        repeating-conic-gradient(
+          from 0deg,
+          rgba(200,155,60,.70) 0deg 1deg,
+          transparent 1deg 5deg
+        );
+      -webkit-mask:
+        radial-gradient(circle,transparent 0 48%,#000 48.5% 49.1%,transparent 49.5% 57%,
+          #000 57.4% 57.9%,transparent 58.4% 100%);
+      mask:
+        radial-gradient(circle,transparent 0 48%,#000 48.5% 49.1%,transparent 49.5% 57%,
+          #000 57.4% 57.9%,transparent 58.4% 100%);
+      animation:lcuRing 120s linear infinite;
+      pointer-events:none;
+    }
+    body::after{
+      content:"";
+      position:fixed;
+      z-index:-1;
+      inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(90deg,rgba(0,0,0,.34),transparent 20%,transparent 80%,rgba(0,0,0,.34)),
+        radial-gradient(circle at center,transparent 20%,rgba(0,0,0,.22) 85%);
+    }
+    @keyframes lcuRing{
+      from{transform:translate(-50%,-50%) rotate(0deg)}
+      to{transform:translate(-50%,-50%) rotate(360deg)}
+    }
+    @media (prefers-reduced-motion:reduce){
+      body::before{animation:none}
+      *,*::before,*::after{scroll-behavior:auto!important}
+    }
+
     button,input{font:inherit}
-    button{min-height:46px;border:0;border-radius:12px;padding:0 16px;font-weight:700;cursor:pointer}
-    button:disabled{opacity:.45;cursor:not-allowed}
-    .primary{background:var(--accent);color:#10131b}.secondary{background:#26324f;color:var(--text)}
-    .danger{background:var(--danger);color:white}.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
-    .wrap{width:min(760px,100%);margin:auto;padding:18px 14px 40px}
-    h1{font-size:22px;margin:4px 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
-    .card{background:rgba(18,26,45,.96);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
-    input{width:100%;background:#0c1426;color:var(--text);border:1px solid var(--line);border-radius:12px;
-      padding:13px 14px;font-size:16px;outline:none}
-    input:focus{border-color:var(--accent)}
+    button{
+      min-height:44px;
+      border-radius:4px;
+      padding:0 16px;
+      font-weight:750;
+      letter-spacing:.02em;
+      cursor:pointer;
+      transition:transform .12s ease,filter .12s ease,border-color .12s ease,
+        background-color .12s ease,color .12s ease,box-shadow .12s ease;
+    }
+    button:not(:disabled):hover{filter:brightness(1.08)}
+    button:not(:disabled):active{transform:translateY(1px);filter:brightness(.94)}
+    button:focus-visible,input:focus-visible{outline:2px solid rgba(200,155,60,.45);outline-offset:2px}
+    button:disabled{opacity:.38;cursor:not-allowed}
+
+    .primary{
+      color:#11100c;
+      border:1px solid #d4ae54;
+      background:linear-gradient(180deg,#d7b35c,#b8862d);
+      box-shadow:inset 0 0 0 1px rgba(255,235,172,.12),0 0 18px rgba(200,155,60,.08);
+    }
+    .primary:not(:disabled):hover{box-shadow:0 0 20px rgba(200,155,60,.16)}
+    .secondary{
+      color:var(--cream);
+      border:1px solid #3b4654;
+      background:linear-gradient(180deg,#202936,#151c27);
+    }
+    .ghost{
+      color:var(--cream2);
+      border:1px solid #4b4434;
+      background:rgba(7,9,13,.45);
+    }
+    .ghost:not(:disabled):hover{border-color:var(--gold);color:var(--cream)}
+    .danger{
+      color:#f7e9e9;
+      border:1px solid #9d4d54;
+      background:linear-gradient(180deg,#8b3942,#64272e);
+    }
+
+    .wrap{
+      width:min(1040px,100%);
+      margin:0 auto;
+      padding:24px 14px 46px;
+    }
+    .brandKicker{
+      margin-top:2px;
+      color:var(--gold);
+      font-family:var(--serif);
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:.23em;
+      text-transform:uppercase;
+      opacity:.9;
+    }
+    h1{
+      margin:5px 0 2px;
+      color:var(--cream);
+      font-family:var(--serif);
+      font-size:clamp(26px,4vw,38px);
+      font-weight:700;
+      letter-spacing:.06em;
+      text-shadow:0 2px 24px rgba(200,155,60,.08);
+    }
+    h2,h3{
+      font-family:var(--serif);
+      color:var(--cream);
+      letter-spacing:.035em;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:12px;
+      margin:0 0 19px;
+      letter-spacing:.03em;
+    }
+
+    .card{
+      position:relative;
+      margin:12px 0;
+      padding:16px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:linear-gradient(180deg,rgba(16,21,30,.96),rgba(10,14,21,.96));
+      box-shadow:0 12px 34px rgba(0,0,0,.20);
+    }
+    .card::before{
+      content:"";
+      position:absolute;
+      top:-1px;
+      left:20px;
+      right:20px;
+      height:1px;
+      background:linear-gradient(90deg,transparent,rgba(200,155,60,.55),transparent);
+      pointer-events:none;
+    }
+
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .between{justify-content:space-between}
+
+    input{
+      width:100%;
+      border:1px solid #333b47;
+      border-radius:4px;
+      padding:12px 13px;
+      font-size:16px;
+      outline:none;
+      color:var(--cream);
+      background:#080b10;
+      transition:border-color .14s ease,box-shadow .14s ease,background-color .14s ease;
+    }
+    input::placeholder{color:#555b63}
+    input:focus{
+      border-color:var(--gold3);
+      background:#0b0e14;
+      box-shadow:inset 0 0 0 1px rgba(200,155,60,.08);
+    }
+
     .hidden{display:none!important}
-    .players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .p{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}
-    .p.you{border-color:var(--accent)} .p.offline{opacity:.5}
-    .name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .meta{font-size:12px;color:var(--muted);margin-top:3px}
-    .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px}
-    .dot.off{background:#6a7181}
-    .heroGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .heroCard{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:center}
-    .heroPic{aspect-ratio:1/1;width:100%;object-fit:cover;display:block;background:#080d18}
-    .unknown{aspect-ratio:1/1;display:grid;place-items:center;font-size:64px;font-weight:900;
-      background:radial-gradient(circle,#273451,#0c1425)}
-    .heroFoot{padding:10px}.status{font-size:12px;color:var(--muted);margin-top:4px}
-    .tag{display:inline-block;padding:3px 8px;border-radius:999px;background:#26324f;font-size:12px}
-    .oktag{background:#153727;color:#9ee8bd}.outtag{background:#472425;color:#ffb0b0}
-    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-    .scoreRow{display:grid;grid-template-columns:42px 1fr 70px 70px;gap:8px;align-items:center;
-      padding:10px 0;border-bottom:1px solid var(--line)}
+
+    .players{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .p{
+      min-width:0;
+      padding:12px;
+      border:1px solid #303744;
+      border-radius:6px;
+      background:linear-gradient(180deg,#121823,#0d121a);
+    }
+    .p.you{
+      border-color:#80652f;
+      box-shadow:inset 0 0 0 1px rgba(200,155,60,.08);
+    }
+    .p.offline{opacity:.48}
+
+    .name{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:var(--cream);
+      font-weight:800;
+    }
+    .meta{font-size:11px;color:var(--muted);margin-top:4px}
+    .dot{
+      display:inline-block;
+      width:7px;
+      height:7px;
+      margin-right:6px;
+      border-radius:50%;
+      background:var(--ok);
+      box-shadow:0 0 8px rgba(86,184,138,.30);
+    }
+    .dot.off{background:#656a72;box-shadow:none}
+
+    .heroGrid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+      align-items:start;
+    }
+    .heroCard{
+      position:relative;
+      overflow:hidden;
+      text-align:center;
+      border:1px solid #303744;
+      border-radius:7px;
+      background:linear-gradient(180deg,#101620,#090d13);
+      box-shadow:0 10px 30px rgba(0,0,0,.22);
+      transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease;
+    }
+    .heroCard:hover{
+      border-color:#5a4d31;
+      box-shadow:0 14px 34px rgba(0,0,0,.28),0 0 0 1px rgba(200,155,60,.03);
+    }
+    .heroCard.you{border-color:#8b6c30}
+    .heroPic{
+      display:block;
+      width:100%;
+      aspect-ratio:1/1;
+      object-fit:cover;
+      background:#080a0f;
+      filter:saturate(.93) contrast(1.03);
+    }
+    .unknown{
+      display:grid;
+      place-items:center;
+      width:100%;
+      aspect-ratio:1/1;
+      color:var(--gold2);
+      font-family:var(--serif);
+      font-size:clamp(54px,10vw,82px);
+      font-weight:700;
+      background:
+        radial-gradient(circle at center,rgba(39,45,57,.82) 0%,rgba(13,17,24,.95) 56%,#080b10 100%);
+      text-shadow:0 0 24px rgba(200,155,60,.16);
+    }
+    .heroFoot{
+      position:relative;
+      padding:11px 11px 12px;
+      background:linear-gradient(180deg,rgba(18,24,34,.98),rgba(9,13,19,.99));
+      border-top:1px solid #242b34;
+    }
+    .heroFoot::before{
+      content:"";
+      position:absolute;
+      top:-1px;
+      left:16%;
+      width:68%;
+      height:1px;
+      background:linear-gradient(90deg,transparent,rgba(200,155,60,.42),transparent);
+    }
+    .status{font-size:11px;color:var(--muted);margin-top:5px}
+
+    .tag{
+      display:inline-block;
+      padding:3px 7px;
+      border:1px solid #39414d;
+      border-radius:3px;
+      background:#141b26;
+      color:#b7bcc5;
+      font-size:11px;
+    }
+    .oktag{
+      border-color:#31654e;
+      background:#10271d;
+      color:#8ed6b0;
+    }
+    .outtag{
+      border-color:#69353a;
+      background:#2a1518;
+      color:#e6a2a7;
+    }
+
+    .notesBox{margin-top:10px;text-align:left}
+    .notesLabel{
+      margin-bottom:6px;
+      color:#817761;
+      font-family:var(--serif);
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .noteList{display:flex;flex-wrap:wrap;gap:5px;min-height:23px}
+    .noteChip{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      max-width:100%;
+      padding:3px 7px;
+      border:1px solid #4a412e;
+      border-radius:3px;
+      background:#15130f;
+      color:#d6c9aa;
+      font-size:11px;
+      line-height:1.3;
+    }
+    .noteChipText{overflow-wrap:anywhere}
+    .noteDelete{
+      display:inline-grid;
+      place-items:center;
+      width:17px;
+      height:17px;
+      min-width:17px;
+      min-height:17px;
+      padding:0;
+      border:0;
+      border-radius:2px;
+      background:#2b261d;
+      color:#958a72;
+      font-size:12px;
+      font-weight:900;
+    }
+    .noteDelete:hover{background:#512b30;color:#fff}
+    .noteEmpty{font-size:11px;color:#5e6063}
+    .noteComposer{
+      margin-top:13px;
+      padding-top:13px;
+      border-top:1px solid #242a33;
+    }
+    .noteComposerRow{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:8px;
+    }
+    .noteComposer input{min-width:0}
+    .noteHint{margin-top:6px;font-size:10px;color:var(--muted2)}
+
+    .heroBrowseBtn{width:100%;margin-top:10px}
+
+    .heroBrowserOverlay{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:12px;
+      background:rgba(2,4,7,.90);
+      backdrop-filter:blur(4px);
+    }
+    .heroBrowserOverlay.hidden{display:none!important}
+    .heroBrowserPanel{
+      width:min(1060px,96vw);
+      height:min(90vh,900px);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      border:1px solid #51442d;
+      border-radius:7px;
+      background:linear-gradient(180deg,#10151e,#080b10);
+      box-shadow:var(--shadow),0 0 0 1px rgba(200,155,60,.06);
+    }
+    .heroBrowserHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:15px 16px 12px;
+      border-bottom:1px solid #2b3038;
+      background:linear-gradient(180deg,#141a24,#0f141c);
+    }
+    .heroBrowserTitle{
+      color:var(--cream);
+      font-family:var(--serif);
+      font-size:20px;
+      font-weight:700;
+      letter-spacing:.06em;
+    }
+    .heroBrowserClose,.closeGame{
+      width:40px;
+      min-width:40px;
+      height:40px;
+      min-height:40px;
+      padding:0;
+      border:1px solid #4c4435;
+      border-radius:50%;
+      background:#11151c;
+      color:#b9ac91;
+      font-size:22px;
+      line-height:1;
+    }
+    .heroBrowserClose:hover,.closeGame:hover{
+      border-color:var(--gold);
+      color:var(--cream);
+      background:#18130c;
+    }
+
+    .heroBrowserTools{
+      padding:12px 14px;
+      border-bottom:1px solid #262d35;
+      background:#0c1017;
+    }
+    .heroRoleTabs{
+      display:flex;
+      gap:6px;
+      overflow-x:auto;
+      padding-bottom:8px;
+      scrollbar-width:thin;
+    }
+    .heroRoleTab{
+      min-height:34px;
+      padding:0 11px;
+      white-space:nowrap;
+      border:1px solid #3b4149;
+      border-radius:3px;
+      background:#111720;
+      color:#aaa9a3;
+      font-size:12px;
+    }
+    .heroRoleTab.active{
+      border-color:#ad8536;
+      color:#151009;
+      background:linear-gradient(180deg,#d1ad57,#af7e29);
+    }
+    .heroSearch{margin-top:1px}
+    .heroBrowserMeta{margin-top:7px;font-size:10px;color:var(--muted)}
+
+    .heroBrowserBody{
+      flex:1;
+      overflow:auto;
+      padding:12px 14px 18px;
+      scrollbar-width:thin;
+      scrollbar-color:#6e5525 transparent;
+    }
+    .heroCatalog{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:9px;
+    }
+    .heroCatalogCard{
+      min-width:0;
+      display:grid;
+      grid-template-columns:64px minmax(0,1fr);
+      gap:10px;
+      align-items:center;
+      padding:7px;
+      border:1px solid #2d333b;
+      border-radius:5px;
+      background:linear-gradient(180deg,#111720,#0c1118);
+      transition:border-color .14s ease,background-color .14s ease,transform .14s ease;
+    }
+    .heroCatalogCard:hover{
+      border-color:#79622f;
+      background:#15191d;
+      transform:translateY(-1px);
+    }
+    .heroCatalogImg{
+      width:64px;
+      height:64px;
+      object-fit:cover;
+      border:1px solid #4f4633;
+      border-radius:2px;
+      background:#07090d;
+    }
+    .heroCatalogInfo{min-width:0}
+    .heroCatalogName{
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:var(--cream);
+      font-family:var(--serif);
+      font-size:15px;
+      font-weight:700;
+    }
+    .heroCatalogTitle{
+      margin-top:3px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:#94918a;
+      font-size:11px;
+    }
+    .heroCatalogTags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+    .heroCatalogTag{
+      padding:2px 5px;
+      border:1px solid #403a2c;
+      border-radius:2px;
+      background:#15130e;
+      color:#a99876;
+      font-size:9px;
+    }
+    .heroCatalogEmpty{padding:30px 10px;text-align:center;color:var(--muted)}
+
+    .actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:9px;
+      margin-top:14px;
+    }
+
+    .scoreRow{
+      display:grid;
+      grid-template-columns:42px 1fr 70px 70px;
+      gap:8px;
+      align-items:center;
+      padding:11px 0;
+      border-bottom:1px solid #242a31;
+    }
+    .scoreRow:last-child{border-bottom:0}
     .roundScoreRow{grid-template-columns:36px 44px minmax(0,1fr) 58px 58px}
-    .roundHero{width:42px;height:42px;border-radius:10px;object-fit:cover;display:block;
-      background:#080d18;border:1px solid var(--line)}
-    .roundHeroUnknown{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;
-      background:#202a42;border:1px solid var(--line);font-weight:900;color:var(--muted)}
-    .scoreRow:last-child{border-bottom:0}.right{text-align:right}
-    .mvp{text-align:center;padding:22px 10px}.crown{font-size:52px}.mvpName{font-size:28px;font-weight:900}
-    .notice{padding:10px 12px;border-radius:10px;background:#262f45;color:#dce5f8;font-size:13px}
-    .err{background:#482227;color:#ffd4d4}.small{font-size:12px;color:var(--muted)}
-    .topscore{font-weight:800;color:#f5cf78}
-    .removeBtn{min-height:34px;padding:0 9px;border-radius:9px;background:transparent;
-      color:#d9a2a2;border:1px solid #5a3940;font-size:12px;font-weight:700}
-    .removeBtn.confirming{background:#6a2f38;color:#fff;border-color:#8c3e49}
-    .playerHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .roundHero{
+      display:block;
+      width:42px;
+      height:42px;
+      object-fit:cover;
+      border:1px solid #544933;
+      border-radius:2px;
+      background:#07090d;
+    }
+    .roundHeroUnknown{
+      display:grid;
+      place-items:center;
+      width:42px;
+      height:42px;
+      border:1px solid #48402f;
+      border-radius:2px;
+      background:#12151a;
+      color:#9d8350;
+      font-family:var(--serif);
+      font-weight:900;
+    }
+    .roundNotes{margin-top:6px}
+    .right{text-align:right}
+    .topscore{font-weight:800;color:#d8b461}
+
+    .mvp{text-align:center;padding:24px 10px}
+    .crown{font-size:48px;filter:saturate(.8)}
+    .mvpName{
+      color:var(--cream);
+      font-family:var(--serif);
+      font-size:28px;
+      font-weight:700;
+      letter-spacing:.04em;
+    }
+
+    .notice{
+      padding:10px 12px;
+      border:1px solid #3a414b;
+      border-radius:4px;
+      background:#111720;
+      color:#c9ced8;
+      font-size:12px;
+    }
+    .err{
+      border-color:#6d3439;
+      background:#251417;
+      color:#e4b6b9;
+    }
+    .small{font-size:11px;color:var(--muted)}
+
+    .removeBtn{
+      min-height:32px;
+      padding:0 8px;
+      border:1px solid #57383a;
+      border-radius:3px;
+      background:transparent;
+      color:#b48386;
+      font-size:11px;
+      font-weight:700;
+    }
+    .removeBtn.confirming{
+      border-color:#95505a;
+      background:#5c2930;
+      color:#fff;
+    }
+
+    .playerHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
     .playerHead .name{min-width:0;flex:1}
-    .gameTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 2px}
+
+    .gameTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:8px 2px 10px;
+      padding:0 2px 8px;
+      border-bottom:1px solid rgba(200,155,60,.18);
+    }
+    .gameTop>b{
+      color:var(--cream);
+      font-family:var(--serif);
+      letter-spacing:.05em;
+    }
     .gameTopRight{display:flex;align-items:center;gap:8px}
-    .closeGame{width:42px;min-width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;
-      background:#252f48;color:var(--text);border:1px solid var(--line);font-size:24px;line-height:1}
-    .closeGame:hover{background:#3a2940;border-color:#70404a}
-    .exitBox{text-align:center;padding:28px 16px}
-    .exitMark{font-size:42px;margin-bottom:8px}
-    @media(min-width:620px){.players{grid-template-columns:repeat(3,minmax(0,1fr))}.heroGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+    .exitBox{text-align:center;padding:30px 16px}
+    .exitMark{
+      margin-bottom:8px;
+      color:#a75c61;
+      font-family:var(--serif);
+      font-size:42px;
+    }
+
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#5f4b24;border-radius:6px}
+    ::selection{background:rgba(200,155,60,.28);color:var(--cream)}
+
+    @media(min-width:620px){
+      .players{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .heroGrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .heroCatalog{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .wrap{padding-left:20px;padding-right:20px}
+    }
+    @media(min-width:920px){
+      .heroGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+      .heroCatalog{grid-template-columns:repeat(4,minmax(0,1fr))}
+    }
+    @media(max-width:480px){
+      .wrap{padding:18px 10px 38px}
+      .card{padding:13px}
+      .heroGrid{gap:8px}
+      .heroFoot{padding:9px}
+      .noteChip{font-size:10px}
+      .heroBrowserPanel{width:100%;height:94vh}
+      .heroBrowserOverlay{padding:7px}
+      .heroCatalog{gap:7px}
+      .heroCatalogCard{grid-template-columns:56px minmax(0,1fr);gap:8px;padding:6px}
+      .heroCatalogImg{width:56px;height:56px}
+      .roundScoreRow{grid-template-columns:28px 40px minmax(0,1fr) 48px 48px}
+      .roundHero,.roundHeroUnknown{width:38px;height:38px}
+    }
   </style>
 </head>
 <body>
 <main class="wrap">
+  <div class="brandKicker">LOL · GUESSING GAME</div>
   <h1>LOL 猜英雄</h1>
-  <p class="sub">连麦交流 · 只看别人头像 · 猜到越早得分越高 · <span style="opacity:.65">v7</span></p>
 
   <div id="setupWarning" class="notice err hidden"></div>
 
@@ -109,6 +724,15 @@
       <div class="actions">
         <button id="guessedBtn" class="primary" type="button">我猜到了</button>
         <button id="giveUpBtn" class="danger" type="button">弃权</button>
+      </div>
+      <button id="heroBrowseBtn" class="ghost heroBrowseBtn" type="button">浏览英雄</button>
+      <div id="noteComposer" class="noteComposer">
+        <div class="small" style="margin-bottom:7px">推理笔记</div>
+        <form id="noteForm" class="noteComposerRow">
+          <input id="noteInput" maxlength="10" placeholder="例如：近战、上单、无蓝条" autocomplete="off" />
+          <button id="addNoteBtn" class="secondary" type="submit">添加</button>
+        </form>
+        <div class="noteHint">所有玩家都能看到你的笔记；只有你可以删除自己的笔记。</div>
       </div>
       <div id="revealBox" class="hidden" style="margin-top:12px;text-align:center">
         <div class="small">你的英雄</div>
@@ -153,6 +777,26 @@
   </section>
 </main>
 
+<div id="heroBrowserOverlay" class="heroBrowserOverlay hidden" role="dialog" aria-modal="true" aria-label="英雄浏览">
+  <div class="heroBrowserPanel">
+    <div class="heroBrowserHeader">
+      <div>
+        <div class="heroBrowserTitle">英雄浏览</div>
+        
+      </div>
+      <button id="heroBrowserClose" class="heroBrowserClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="heroBrowserTools">
+      <div id="heroRoleTabs" class="heroRoleTabs"></div>
+      <input id="heroSearch" class="heroSearch" placeholder="搜索英雄名、称号…" autocomplete="off" />
+      <div id="heroBrowserMeta" class="heroBrowserMeta"></div>
+    </div>
+    <div class="heroBrowserBody">
+      <div id="heroCatalog" class="heroCatalog"></div>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 /* ===========================
    1) 把你的 Firebase 配置粘贴这里
@@ -168,19 +812,24 @@ const firebaseConfig = {
 };
 
 const ROOT = "lolGuessGame";
+const BUILD_VERSION = "v12-stability";
 const $ = id => document.getElementById(id);
 const views = ["joinView","lobbyView","gameView","exitView","roundEndView","finalView"];
 let db, gameRef, meId, currentGame = null;
 let disconnectHandle = null;
 let disconnectMode = "";
+let disconnectGuardSeq = 0;
 let closingRound = false;
 let explicitExitLocal = false;
+let roundStartBusy = false;
+let backendAvailable = false;
+let championLoadPromise = null;
 
 const INACTIVITY_LIMIT_MS = 10 * 60 * 1000;   // 10 分钟
 const ACTIVITY_WRITE_THROTTLE_MS = 30 * 1000; // 最多每 30 秒写一次活动时间
 let lastActivityWrite = 0;
 let inactivityTimer = null;
-let ddragonVersion = null, champions = [];
+let ddragonVersion = null, champions = [], championMeta = [];
 
 function showView(id){
   views.forEach(v => $(v).classList.toggle("hidden", v !== id));
@@ -194,16 +843,202 @@ function esc(s=""){
 function setupMissing(){
   return Object.values(firebaseConfig).some(v => !v || v==="PASTE_HERE");
 }
+
+const VALID_STATUSES=new Set(["lobby","guessing","guessed","gaveup","left"]);
+function safeStatus(value,fallback="guessing"){
+  return VALID_STATUSES.has(value) ? value : fallback;
+}
+function safeInt(value,fallback=0,min=0,max=1_000_000_000){
+  const n=Number(value);
+  if(!Number.isFinite(n)) return fallback;
+  return Math.min(max,Math.max(min,Math.trunc(n)));
+}
+function safeTimestamp(value){
+  const n=Number(value);
+  return Number.isFinite(n) && n>0 ? n : 0;
+}
+function safePlayerName(p){
+  const s=String(p?.name ?? "").trim();
+  return Array.from(s || "玩家").slice(0,16).join("");
+}
+function safeChampionId(value){
+  if(value==null) return null;
+  const id=String(value);
+  if(!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
+  if(champions.length && !champions.includes(id)) return null;
+  return id;
+}
+function setBackendUnavailable(message){
+  backendAvailable=false;
+  $("setupWarning").textContent=message;
+  $("setupWarning").classList.remove("hidden");
+  $("nameInput").disabled=true;
+  $("joinForm").querySelector("button").disabled=true;
+  ["leaveBtn","startBtn","nextRoundBtn","guessedBtn","giveUpBtn","addNoteBtn",
+   "forceExitBtn","roundExitBtn","finalExitBtn","endGameBtn","restartBtn"]
+    .forEach(id=>{ if($(id)) $(id).disabled=true; });
+}
+function clearBackendWarning(){
+  backendAvailable=true;
+  $("setupWarning").classList.add("hidden");
+  $("nameInput").disabled=false;
+  $("joinForm").querySelector("button").disabled=false;
+}
+
 function heroUrl(champId){
-  if(!ddragonVersion || !champId) return "";
-  return `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/champion/${champId}.png`;
+  const safeId=safeChampionId(champId);
+  if(!ddragonVersion || !safeId) return "";
+  return `https://ddragon.leagueoflegends.com/cdn/${encodeURIComponent(ddragonVersion)}/img/champion/${encodeURIComponent(safeId)}.png`;
 }
+
+async function fetchJsonChecked(url,label){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),10000);
+  try{
+    const res=await fetch(url,{signal:controller.signal,cache:"no-store"});
+    if(!res.ok) throw new Error(`${label} HTTP ${res.status}`);
+    return await res.json();
+  }catch(e){
+    if(e?.name==="AbortError") throw new Error(`${label}请求超时`);
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 async function loadChampions(){
-  const versions = await fetch("https://ddragon.leagueoflegends.com/api/versions.json").then(r=>r.json());
-  ddragonVersion = versions[0];
-  const data = await fetch(`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/data/en_US/champion.json`).then(r=>r.json());
-  champions = Object.values(data.data).map(c => c.id);
+  if(champions.length && championMeta.length) return;
+  if(championLoadPromise) return championLoadPromise;
+
+  championLoadPromise=(async()=>{
+    const versions=await fetchJsonChecked(
+      "https://ddragon.leagueoflegends.com/api/versions.json",
+      "Data Dragon版本"
+    );
+    if(!Array.isArray(versions) || !versions.length || typeof versions[0]!=="string"){
+      throw new Error("Data Dragon版本数据无效");
+    }
+
+    const version=versions[0];
+    const data=await fetchJsonChecked(
+      `https://ddragon.leagueoflegends.com/cdn/${encodeURIComponent(version)}/data/zh_CN/champion.json`,
+      "英雄数据"
+    );
+    const raw=data?.data;
+    if(!raw || typeof raw!=="object"){
+      throw new Error("英雄数据格式无效");
+    }
+
+    const meta=Object.values(raw)
+      .filter(c=>c && typeof c==="object" && /^[A-Za-z0-9_-]{1,64}$/.test(String(c.id||"")))
+      .map(c=>({
+        id:String(c.id),
+        key:String(c.key ?? ""),
+        name:String(c.name ?? "").trim(),
+        title:String(c.title ?? "").trim(),
+        tags:Array.isArray(c.tags) ? c.tags.filter(t=>typeof t==="string") : [],
+        partype:String(c.partype ?? ""),
+        blurb:String(c.blurb ?? "")
+      }))
+      .filter(c=>c.id && c.name)
+      .sort((a,b)=>a.name.localeCompare(b.name,"zh-CN"));
+
+    if(meta.length<100){
+      throw new Error(`英雄数据数量异常（${meta.length}）`);
+    }
+
+    ddragonVersion=version;
+    championMeta=meta;
+    champions=meta.map(c=>c.id);
+  })();
+
+  try{
+    await championLoadPromise;
+  }finally{
+    championLoadPromise=null;
+  }
 }
+
+const HERO_ROLE_LABELS={
+  Fighter:"战士",
+  Tank:"坦克",
+  Mage:"法师",
+  Assassin:"刺客",
+  Marksman:"射手",
+  Support:"辅助"
+};
+const HERO_ROLE_ORDER=["ALL","Fighter","Tank","Mage","Assassin","Marksman","Support"];
+let heroBrowserRole="ALL";
+let heroBrowserQuery="";
+
+function heroRoleLabel(tag){
+  return HERO_ROLE_LABELS[tag] || tag;
+}
+function renderHeroBrowser(){
+  if(!$("heroCatalog") || $("heroBrowserOverlay").classList.contains("hidden")) return;
+
+  const q=heroBrowserQuery.trim().toLowerCase();
+  const filtered=championMeta.filter(c=>{
+    const roleOk=heroBrowserRole==="ALL" || c.tags.includes(heroBrowserRole);
+    if(!roleOk) return false;
+    if(!q) return true;
+    const hay=`${c.name} ${c.title} ${c.id}`.toLowerCase();
+    return hay.includes(q);
+  });
+
+  $("heroRoleTabs").innerHTML=HERO_ROLE_ORDER.map(tag=>{
+    const label=tag==="ALL" ? "全部" : heroRoleLabel(tag);
+    const count=tag==="ALL"
+      ? championMeta.length
+      : championMeta.filter(c=>c.tags.includes(tag)).length;
+    return `<button type="button" class="heroRoleTab ${tag===heroBrowserRole?"active":""}"
+      data-hero-role="${tag}">${label} ${count}</button>`;
+  }).join("");
+
+  $("heroBrowserMeta").textContent=`显示 ${filtered.length} / ${championMeta.length} 位英雄`;
+
+  if(!filtered.length){
+    $("heroCatalog").innerHTML=`<div class="heroCatalogEmpty">没有符合条件的英雄</div>`;
+  }else{
+    $("heroCatalog").innerHTML=filtered.map(c=>`
+      <div class="heroCatalogCard">
+        <img class="heroCatalogImg" src="${heroUrl(c.id)}" alt="${esc(c.name)}">
+        <div class="heroCatalogInfo">
+          <div class="heroCatalogName">${esc(c.name)}</div>
+          <div class="heroCatalogTitle">${esc(c.title)}</div>
+          <div class="heroCatalogTags">
+            ${c.tags.map(t=>`<span class="heroCatalogTag">${esc(heroRoleLabel(t))}</span>`).join("")}
+          </div>
+        </div>
+      </div>`).join("");
+  }
+
+  document.querySelectorAll("[data-hero-role]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      heroBrowserRole=btn.dataset.heroRole || "ALL";
+      renderHeroBrowser();
+    });
+  });
+}
+
+async function openHeroBrowser(){
+  if(championMeta.length===0){
+    try{
+      await loadChampions();
+    }catch(e){
+      alert("英雄数据加载失败："+e.message);
+      return;
+    }
+  }
+  $("heroBrowserOverlay").classList.remove("hidden");
+  renderHeroBrowser();
+  setTimeout(()=>$("heroSearch").focus(),0);
+}
+
+function closeHeroBrowser(){
+  $("heroBrowserOverlay").classList.add("hidden");
+}
+
 function shuffle(a){
   a=[...a];
   for(let i=a.length-1;i>0;i--){
@@ -212,20 +1047,72 @@ function shuffle(a){
   return a;
 }
 function activePlayers(g=currentGame){
-  return Object.entries(g?.players||{}).filter(([,p])=>p.inMatch);
+  return Object.entries(g?.players||{}).filter(([,p])=>p && typeof p==="object" && p.inMatch===true);
 }
 function allOnlinePlayers(g=currentGame){
-  return Object.entries(g?.players||{}).filter(([,p])=>p.online);
+  return Object.entries(g?.players||{}).filter(([,p])=>p && typeof p==="object" && p.online===true);
 }
 function rankPlayers(entries){
-  return [...entries].sort((a,b)=>(b[1].score||0)-(a[1].score||0) || (a[1].joinedAt||0)-(b[1].joinedAt||0));
+  return [...entries].sort((a,b)=>
+    safeInt(b[1]?.score)-safeInt(a[1]?.score) ||
+    safeTimestamp(a[1]?.joinedAt)-safeTimestamp(b[1]?.joinedAt)
+  );
+}
+
+function sortedNotes(p){
+  return Object.entries(p?.notes && typeof p.notes==="object" ? p.notes : {})
+    .filter(([,n])=>n && typeof n==="object" && String(n.text||"").trim())
+    .map(([id,n])=>[
+      String(id),
+      {
+        text:Array.from(String(n.text||"").trim().replace(/\s+/g," ")).slice(0,10).join(""),
+        createdAt:safeTimestamp(n.createdAt)
+      }
+    ])
+    .filter(([,n])=>n.text)
+    .sort((a,b)=>a[1].createdAt-b[1].createdAt)
+    .slice(0,50);
+}
+
+function notesHtml(p,ownerId,{editable=false,roundEnd=false}={}){
+  const notes=sortedNotes(p);
+  const label=`<div class="notesLabel">推理笔记</div>`;
+  if(!notes.length){
+    return `<div class="notesBox ${roundEnd?"roundNotes":""}">${label}<div class="noteEmpty">暂无笔记</div></div>`;
+  }
+  const chips=notes.map(([noteId,n])=>{
+    const del=editable
+      ? `<button type="button" class="noteDelete" data-delete-note="${esc(noteId)}" aria-label="删除笔记" title="删除">×</button>`
+      : "";
+    return `<span class="noteChip"><span class="noteChipText">${esc(n.text)}</span>${del}</span>`;
+  }).join("");
+  return `<div class="notesBox ${roundEnd?"roundNotes":""}">${label}<div class="noteList">${chips}</div></div>`;
+}
+
+function bindNoteDeleteButtons(){
+  document.querySelectorAll("[data-delete-note]").forEach(btn=>{
+    if(btn.dataset.bound==="1") return;
+    btn.dataset.bound="1";
+    btn.addEventListener("click",async()=>{
+      const noteId=btn.dataset.deleteNote;
+      if(!backendAvailable || !noteId || !meId || !db) return;
+      btn.disabled=true;
+      try{
+        await remove(ref(db,`${ROOT}/players/${meId}/notes/${noteId}`));
+        touchActivity(false).catch(()=>{});
+      }catch(e){
+        console.warn("删除笔记失败",e);
+        btn.disabled=false;
+      }
+    });
+  });
 }
 
 const removeConfirmTimers = new Map();
 
 function removeButtonHtml(id){
   if(id===meId) return "";
-  return `<button type="button" class="removeBtn" data-remove-player="${id}">移除</button>`;
+  return `<button type="button" class="removeBtn" data-remove-player="${esc(id)}">移除</button>`;
 }
 
 function bindRemoveButtons(){
@@ -267,7 +1154,7 @@ function bindRemoveButtons(){
 }
 
 async function removePlayer(targetId){
-  if(!targetId || targetId===meId) return;
+  if(!backendAvailable || !gameRef || !targetId || targetId===meId) return;
 
   await runTransaction(gameRef,game=>{
     if(!game?.players?.[targetId]) return game;
@@ -281,7 +1168,7 @@ async function removePlayer(targetId){
 
       if(remaining.length===0){
         resetToLobby(game);
-      }else if(remaining.every(p=>p.status!=="guessing")){
+      }else if(remaining.every(p=>safeStatus(p.status,"guessing")!=="guessing")){
         for(const p of remaining){
           if(!p.roundChampionId && p.championId) p.roundChampionId=p.championId;
         }
@@ -303,52 +1190,78 @@ async function removePlayer(targetId){
 }
 
 async function touchActivity(force=false){
-  if(!db || !currentGame) return;
+  if(!backendAvailable || !gameRef || !currentGame || !meId) return;
+
   const phase=currentGame.state?.phase||"lobby";
-  if(phase==="lobby") return;
+  const me=currentGame.players?.[meId];
+
+  // Only a real participant in the current match can keep the match alive.
+  if(phase==="lobby" || !me || me.online!==true || me.inMatch!==true) return;
 
   const now=Date.now();
 
-  // 先检查是否已经超过 10 分钟；若已超时，不允许一次新的点击把旧对局“复活”。
-  const timedOut = await checkInactivityTimeout();
-  if(timedOut) return;
-
-  if(!force && now-lastActivityWrite < ACTIVITY_WRITE_THROTTLE_MS) return;
+  // Real throttle before any Firebase read/transaction.
+  if(!force && now-lastActivityWrite<ACTIVITY_WRITE_THROTTLE_MS) return;
   lastActivityWrite=now;
 
   try{
-    await set(ref(db,`${ROOT}/state/lastActivity`),now);
+    await runTransaction(gameRef,game=>{
+      if(!game) return game;
+
+      const livePhase=game.state?.phase||"lobby";
+      const liveMe=game.players?.[meId];
+      if(livePhase==="lobby" || !liveMe || liveMe.online!==true || liveMe.inMatch!==true){
+        return game;
+      }
+
+      const last=safeTimestamp(game.state?.lastActivity);
+
+      // Do not resurrect an already expired match.
+      if(last && now-last>=INACTIVITY_LIMIT_MS){
+        resetToLobby(game);
+        return game;
+      }
+
+      game.state.lastActivity=now;
+      return game;
+    });
   }catch(e){
+    if(lastActivityWrite===now) lastActivityWrite=0;
     console.warn("活动时间更新失败",e);
   }
 }
 
 async function checkInactivityTimeout(){
   if(!gameRef) return false;
-  const now=Date.now();
-  let timedOut=false;
 
-  await runTransaction(gameRef,game=>{
+  const now=Date.now();
+  const localPhase=currentGame?.state?.phase||"lobby";
+  const localLast=safeTimestamp(currentGame?.state?.lastActivity);
+  const locallyExpired=localPhase!=="lobby" && !!localLast && now-localLast>=INACTIVITY_LIMIT_MS;
+
+  const result=await runTransaction(gameRef,game=>{
     if(!game) return game;
+
     const phase=game.state?.phase||"lobby";
     if(phase==="lobby") return game;
 
-    const last=Number(game.state?.lastActivity||0);
+    const last=safeTimestamp(game.state?.lastActivity);
 
-    // 旧版本没有 lastActivity 时，从现在开始计时，避免升级后立刻结束旧对局。
+    // Old versions may not have lastActivity. Start timing from now.
     if(!last){
       game.state.lastActivity=now;
       return game;
     }
 
-    if(now-last >= INACTIVITY_LIMIT_MS){
+    if(now-last>=INACTIVITY_LIMIT_MS){
       resetToLobby(game);
-      timedOut=true;
     }
     return game;
   });
 
-  return timedOut;
+  // No mutable flag is written from inside a transaction callback.
+  const finalGame=result?.snapshot?.val?.() || null;
+  return Boolean(locallyExpired && finalGame?.state?.phase==="lobby");
 }
 
 function startInactivityWatcher(){
@@ -366,6 +1279,7 @@ function resetToLobby(game){
     p.roundScore=0;
     p.championId=null;
     p.roundChampionId=null;
+    p.notes=null;
     p.finishOrder=null;
   }
   return game;
@@ -377,26 +1291,51 @@ async function recoverAbandonedGame(){
     const phase=game.state?.phase||"lobby";
     if(phase==="lobby") return game;
 
-    const anyoneOnline=Object.values(game.players||{}).some(p=>p.online);
+    const anyoneOnline=Object.values(game.players||{}).some(p=>p?.online===true);
     if(!anyoneOnline) resetToLobby(game);
     return game;
   });
 }
 
 async function configureDisconnectGuard(g=currentGame){
+  const seq=++disconnectGuardSeq;
   if(!db || !meId) return;
-  const me=g?.players?.[meId];
-  if(!me) return;
 
-  const shouldExitMatch = g?.state?.phase==="playing" && me.inMatch && me.status==="guessing";
-  const mode = shouldExitMatch ? "exitMatch" : "offlineOnly";
+  const me=g?.players?.[meId];
+
+  // If this player was removed from Firebase, cancel the old onDisconnect hook.
+  // Otherwise closing the removed client's tab could recreate a partial "ghost" player.
+  if(!me){
+    const oldHandle=disconnectHandle;
+    disconnectHandle=null;
+    disconnectMode="";
+    if(oldHandle){
+      try{ await oldHandle.cancel(); }catch(e){ console.warn("取消旧 onDisconnect 失败",e); }
+    }
+    return;
+  }
+
+  const status=safeStatus(me.status,me.inMatch===true?"guessing":"lobby");
+  const shouldExitMatch=
+    g?.state?.phase==="playing" &&
+    me.inMatch===true &&
+    status==="guessing";
+  const mode=shouldExitMatch ? "exitMatch" : "offlineOnly";
+
   if(disconnectMode===mode && disconnectHandle) return;
 
+  const oldHandle=disconnectHandle;
+  disconnectHandle=null;
+  disconnectMode="";
+
   try{
-    if(disconnectHandle) await disconnectHandle.cancel();
-    disconnectHandle = onDisconnect(ref(db,`${ROOT}/players/${meId}`));
+    if(oldHandle) await oldHandle.cancel();
+    if(seq!==disconnectGuardSeq) return;
+
+    const handle=onDisconnect(ref(db,`${ROOT}/players/${meId}`));
+
     if(shouldExitMatch){
-      await disconnectHandle.update({
+      await handle.update({
         online:false,
         inMatch:false,
         status:"left",
@@ -404,8 +1343,16 @@ async function configureDisconnectGuard(g=currentGame){
         finishOrder:null
       });
     }else{
-      await disconnectHandle.update({online:false});
+      await handle.update({online:false});
     }
+
+    // A newer snapshot may have requested another disconnect mode while awaiting Firebase.
+    if(seq!==disconnectGuardSeq){
+      try{ await handle.cancel(); }catch(e){}
+      return;
+    }
+
+    disconnectHandle=handle;
     disconnectMode=mode;
   }catch(e){
     console.warn("onDisconnect 配置失败",e);
@@ -430,13 +1377,13 @@ async function maybeCloseRound(g=currentGame){
     return;
   }
 
-  if(participants.every(p=>p.status!=="guessing")){
+  if(participants.every(p=>safeStatus(p.status,"guessing")!=="guessing")){
     closingRound=true;
     try{
       await runTransaction(gameRef,game=>{
         if(!game || game.state?.phase!=="playing") return game;
         const live=Object.values(game.players||{}).filter(p=>p.inMatch);
-        if(live.length && live.every(p=>p.status!=="guessing")){
+        if(live.length && live.every(p=>safeStatus(p.status,"guessing")!=="guessing")){
           for(const p of live){
             if(!p.roundChampionId && p.championId) p.roundChampionId=p.championId;
           }
@@ -461,7 +1408,7 @@ function render(){
   }
   const phase=g.state?.phase||"lobby";
 
-  if(explicitExitLocal || (phase!=="lobby" && me.status==="left")){
+  if(explicitExitLocal || (phase!=="lobby" && safeStatus(me.status,"guessing")==="left")){
     showView("exitView");
     return;
   }
@@ -473,56 +1420,65 @@ function render(){
     $("lobbyPlayers").innerHTML=ps.map(([id,p])=>`
       <div class="p ${id===meId?"you":""}">
         <div class="playerHead">
-          <div class="name"><span class="dot"></span>${esc(p.name)}${id===meId?"（你）":""}</div>
+          <div class="name"><span class="dot"></span>${esc(safePlayerName(p))}${id===meId?"（你）":""}</div>
           ${removeButtonHtml(id)}
         </div>
         <div class="meta">已加入</div>
       </div>`).join("");
     bindRemoveButtons();
-    $("startBtn").disabled=ps.length<2;
+    $("startBtn").disabled=ps.length<2 || roundStartBusy || !backendAvailable;
     return;
   }
 
   if(phase==="playing"){
     showView("gameView");
-    $("roundNo").textContent=g.state.round||1;
-    $("myScore").textContent=me.score||0;
+    $("roundNo").textContent=safeInt(g.state?.round,1,1,9999);
+    $("myScore").textContent=safeInt(me.score);
     const participants=activePlayers(g);
     $("heroGrid").innerHTML=participants.map(([id,p])=>{
       const isMe=id===meId;
-      const canSee = !isMe || p.status!=="guessing";
+      const pStatus=safeStatus(p.status,"guessing");
+      const canSee = !isMe || pStatus!=="guessing";
       let media;
-      if(canSee && p.championId){
-        media=`<img class="heroPic" src="${heroUrl(p.championId)}" alt="英雄头像">`;
+      const visibleChampionId=safeChampionId(p.championId);
+      if(canSee && visibleChampionId){
+        media=`<img class="heroPic" src="${heroUrl(visibleChampionId)}" alt="英雄头像">`;
       } else {
         media=`<div class="unknown" aria-label="未知英雄">?</div>`;
       }
-      let stat = p.status==="guessed" ? `<span class="tag oktag">已猜到 +${p.roundScore||0}</span>`
-               : p.status==="gaveup" ? `<span class="tag outtag">已弃权 +0</span>`
+      const renderStatus=pStatus;
+      let stat = renderStatus==="guessed" ? `<span class="tag oktag">已猜到 +${safeInt(p.roundScore)}</span>`
+               : renderStatus==="gaveup" ? `<span class="tag outtag">已弃权 +0</span>`
                : `<span class="tag">猜测中</span>`;
       return `<div class="heroCard ${isMe?"you":""}">
         ${media}
         <div class="heroFoot">
           <div class="playerHead">
-            <div class="name">${esc(p.name)}${isMe?"（你）":""}</div>
+            <div class="name">${esc(safePlayerName(p))}${isMe?"（你）":""}</div>
             ${removeButtonHtml(id)}
           </div>
           <div class="status">${stat}</div>
+          ${notesHtml(p,id,{editable:isMe && pStatus==="guessing"})}
         </div>
       </div>`;
     }).join("");
     bindRemoveButtons();
+    bindNoteDeleteButtons();
 
-    const done=me.status!=="guessing";
+    const done=safeStatus(me.status,"guessing")!=="guessing";
     $("guessedBtn").disabled=done;
     $("giveUpBtn").disabled=done;
+    $("noteInput").disabled=done;
+    $("addNoteBtn").disabled=done;
+    $("noteComposer").classList.toggle("hidden",false);
     $("myStateText").textContent =
-      me.status==="guessed" ? `已猜到，本轮 +${me.roundScore||0}`
-      : me.status==="gaveup" ? "已弃权，本轮 +0"
+      safeStatus(me.status,"guessing")==="guessed" ? `已猜到，本轮 +${safeInt(me.roundScore)}`
+      : safeStatus(me.status,"guessing")==="gaveup" ? "已弃权，本轮 +0"
       : "你的英雄：？？？";
-    if(done && me.championId){
+    const myChampionId=safeChampionId(me.championId);
+    if(done && myChampionId){
       $("revealBox").classList.remove("hidden");
-      $("revealImg").src=heroUrl(me.championId);
+      $("revealImg").src=heroUrl(myChampionId);
     }else{
       $("revealBox").classList.add("hidden");
     }
@@ -533,22 +1489,23 @@ function render(){
     showView("roundEndView");
     const ps=rankPlayers(activePlayers(g));
     $("roundScores").innerHTML=ps.map(([id,p],i)=>{
-      const resultChampionId = p.roundChampionId || p.championId || null;
+      const resultChampionId = safeChampionId(p.roundChampionId) || safeChampionId(p.championId) || null;
       const hero = resultChampionId
-        ? `<img class="roundHero" data-round-hero src="${heroUrl(resultChampionId)}" alt="${esc(p.name)}本轮英雄头像">`
+        ? `<img class="roundHero" data-round-hero src="${heroUrl(resultChampionId)}" alt="${esc(safePlayerName(p))}本轮英雄头像">`
         : `<div class="roundHeroUnknown" aria-label="英雄未知">?</div>`;
       return `<div class="scoreRow roundScoreRow">
         <div>${i+1}</div>
         <div>${hero}</div>
         <div>
           <div class="playerHead">
-            <div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
+            <div class="name">${esc(safePlayerName(p))}${id===meId?"（你）":""}</div>
             ${removeButtonHtml(id)}
           </div>
-          <div class="small">${p.status==="gaveup"?"弃权":"完成"}</div>
+          <div class="small">${safeStatus(p.status,"guessed")==="gaveup"?"弃权":"完成"}</div>
+          ${notesHtml(p,id,{editable:false,roundEnd:true})}
         </div>
-        <div class="right">+${p.roundScore||0}</div>
-        <div class="right topscore">${p.score||0}</div>
+        <div class="right">+${safeInt(p.roundScore)}</div>
+        <div class="right topscore">${safeInt(p.score)}</div>
       </div>`;
     }).join("");
     bindRemoveButtons();
@@ -567,65 +1524,152 @@ function render(){
   if(phase==="gameEnd"){
     showView("finalView");
     const ps=rankPlayers(activePlayers(g));
-    const max=ps.length ? (ps[0][1].score||0) : 0;
-    const mvps=ps.filter(([,p])=>(p.score||0)===max).map(([,p])=>p.name);
+    const max=ps.length ? safeInt(ps[0][1].score) : 0;
+    const mvps=ps.filter(([,p])=>safeInt(p.score)===max).map(([,p])=>safePlayerName(p));
     $("mvpBox").innerHTML=`<div class="crown">🏆</div><div class="small">MVP</div>
       <div class="mvpName">${esc(mvps.join(" & "))}</div><div class="topscore">${max} 分</div>`;
     $("finalScores").innerHTML=ps.map(([id,p],i)=>`
       <div class="scoreRow">
         <div>${i+1}</div>
         <div class="playerHead">
-          <div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
+          <div class="name">${esc(safePlayerName(p))}${id===meId?"（你）":""}</div>
           ${removeButtonHtml(id)}
         </div>
-        <div></div><div class="right topscore">${p.score||0}</div>
+        <div></div><div class="right topscore">${safeInt(p.score)}</div>
       </div>`).join("");
     bindRemoveButtons();
   }
 }
-async function assignAndStartRound(isFirst){
-  if(champions.length===0) await loadChampions();
-  const snap = await get(gameRef);
-  const g=snap.val()||{};
-  const eligible=Object.entries(g.players||{}).filter(([,p])=>
-    isFirst ? p.online : (p.inMatch && p.online && p.status!=="left")
-  );
-  if(eligible.length<2){ alert("至少需要 2 名玩家。"); return; }
-  const pool=shuffle(champions);
-  const assignments={};
-  eligible.forEach(([id],i)=>assignments[id]=pool[i%pool.length]);
+function seedFromString(s){
+  let h=2166136261>>>0;
+  for(const ch of String(s)){
+    h^=ch.codePointAt(0);
+    h=Math.imul(h,16777619)>>>0;
+  }
+  return h||0x9e3779b9;
+}
+function seededShuffle(a,seedText){
+  const out=[...a];
+  let x=seedFromString(seedText);
+  const rand=()=>{
+    x^=x<<13; x>>>=0;
+    x^=x>>>17; x>>>=0;
+    x^=x<<5; x>>>=0;
+    return (x>>>0)/4294967296;
+  };
+  for(let i=out.length-1;i>0;i--){
+    const j=Math.floor(rand()*(i+1));
+    [out[i],out[j]]=[out[j],out[i]];
+  }
+  return out;
+}
 
-  await runTransaction(gameRef, game=>{
-    if(!game) return game;
-    const phase=game.state?.phase||"lobby";
-    if(isFirst && phase!=="lobby") return;
-    if(!isFirst && phase!=="roundEnd") return;
-    const liveIds=Object.entries(game.players||{})
-      .filter(([,p])=>isFirst ? p.online : (p.inMatch && p.online && p.status!=="left")).map(([id])=>id);
-    if(liveIds.length<2) return;
-    const nextRound=isFirst?1:(game.state.round||1)+1;
-    game.state={
-      phase:"playing",
-      round:nextRound,
-      finishCounter:0,
-      participantCount:liveIds.length,
-      lastActivity:Date.now()
-    };
-    for(const [id,p] of Object.entries(game.players||{})){
-      const participates=liveIds.includes(id);
-      p.inMatch=participates;
-      if(participates){
-        if(isFirst) p.score=0;
-        const assignedChampion=assignments[id] || pool[Math.floor(Math.random()*pool.length)];
-        p.championId=assignedChampion;
-        p.roundChampionId=assignedChampion;
-        p.status="guessing"; p.roundScore=0; p.finishOrder=null;
+async function assignAndStartRound(isFirst){
+  if(roundStartBusy || !backendAvailable || !gameRef) return;
+  roundStartBusy=true;
+
+  const button=isFirst ? $("startBtn") : $("nextRoundBtn");
+  const oldDisabled=button.disabled;
+  button.disabled=true;
+
+  try{
+    if(champions.length===0){
+      try{
+        await loadChampions();
+      }catch(e){
+        console.warn("英雄数据加载失败",e);
+        alert("英雄数据加载失败，暂时无法开始游戏。\n\n"+(e?.message||"请检查网络后重试。"));
+        return;
       }
     }
-    return game;
-  });
+
+    if(champions.length<2){
+      alert("英雄数据不完整，暂时无法开始游戏。");
+      return;
+    }
+
+    // The seed is captured once, so Firebase transaction retries keep the same shuffle.
+    const seed=`${Date.now()}-${meId}-${uid()}`;
+    const pool=seededShuffle(champions,seed);
+
+    const result=await runTransaction(gameRef,game=>{
+      if(!game) return game;
+
+      const phase=game.state?.phase||"lobby";
+      if(isFirst && phase!=="lobby") return game;
+      if(!isFirst && phase!=="roundEnd") return game;
+
+      const liveIds=Object.entries(game.players||{})
+        .filter(([,p])=>
+          p && typeof p==="object" &&
+          (isFirst
+            ? p.online===true
+            : (p.inMatch===true && p.online===true && safeStatus(p.status,"left")!=="left"))
+        )
+        .map(([id])=>id)
+        .sort();
+
+      if(liveIds.length<2 || liveIds.length>pool.length) return game;
+
+      const liveSet=new Set(liveIds);
+      const assignmentIndex=new Map(liveIds.map((id,i)=>[id,i]));
+      const nextRound=isFirst ? 1 : safeInt(game.state?.round,1,1,9998)+1;
+
+      game.state={
+        phase:"playing",
+        round:nextRound,
+        finishCounter:0,
+        participantCount:liveIds.length,
+        lastActivity:Date.now()
+      };
+
+      for(const [id,p] of Object.entries(game.players||{})){
+        if(!p || typeof p!=="object") continue;
+
+        const participates=liveSet.has(id);
+        p.inMatch=participates;
+
+        if(participates){
+          if(isFirst) p.score=0;
+          const assignedChampion=pool[assignmentIndex.get(id)];
+          p.championId=assignedChampion;
+          p.roundChampionId=assignedChampion;
+          p.notes=null;
+          p.status="guessing";
+          p.roundScore=0;
+          p.finishOrder=null;
+        }
+      }
+      return game;
+    });
+
+    const finalGame=result?.snapshot?.val?.() || null;
+    const finalPhase=finalGame?.state?.phase||"lobby";
+
+    if(finalPhase!=="playing"){
+      const eligibleNow=Object.values(finalGame?.players||{}).filter(p=>
+        p && typeof p==="object" &&
+        (isFirst
+          ? p.online===true
+          : (p.inMatch===true && p.online===true && safeStatus(p.status,"left")!=="left"))
+      ).length;
+
+      if(eligibleNow<2) alert("至少需要 2 名玩家。");
+      else if(eligibleNow>champions.length) alert("在线玩家数量超过可用英雄数量，无法保证英雄唯一。");
+      else alert("游戏状态已经变化，请稍后重试。");
+    }
+  }catch(e){
+    console.error("开始回合失败",e);
+    alert("开始游戏失败："+(e?.message||"未知错误"));
+  }finally{
+    roundStartBusy=false;
+    // render() will normally restore the correct disabled state from Firebase.
+    // If nothing changed, restore the pre-click state.
+    if(button && document.body.contains(button)) button.disabled=oldDisabled;
+  }
 }
 async function finishMe(kind){
+  if(!backendAvailable || !gameRef || !meId) return;
   await runTransaction(gameRef, game=>{
     if(!game || game.state?.phase!=="playing") return game;
     const p=game.players?.[meId];
@@ -636,16 +1680,19 @@ async function finishMe(kind){
     if(!p.roundChampionId && p.championId) p.roundChampionId=p.championId;
 
     if(kind==="guessed"){
-      game.state.finishCounter=(game.state.finishCounter||0)+1;
+      game.state.finishCounter=safeInt(game.state.finishCounter,0,0,100000)+1;
       const order=game.state.finishCounter;
-      const n=game.state.participantCount||1;
+      const n=safeInt(game.state.participantCount,1,1,100000);
       const points=Math.max(1,n-order+1);
-      p.status="guessed"; p.finishOrder=order; p.roundScore=points; p.score=(p.score||0)+points;
+      p.status="guessed";
+      p.finishOrder=order;
+      p.roundScore=points;
+      p.score=safeInt(p.score)+points;
     }else{
       p.status="gaveup"; p.finishOrder=null; p.roundScore=0;
     }
     const participants=Object.values(game.players||{}).filter(x=>x.inMatch);
-    if(participants.length && participants.every(x=>x.status!=="guessing")){
+    if(participants.length && participants.every(x=>safeStatus(x.status,"guessing")!=="guessing")){
       for(const x of participants){
         if(!x.roundChampionId && x.championId) x.roundChampionId=x.championId;
       }
@@ -656,6 +1703,7 @@ async function finishMe(kind){
 }
 
 async function forceExitMatch(){
+  if(!backendAvailable || !gameRef || !meId) return;
   explicitExitLocal=true;
 
   await runTransaction(gameRef,game=>{
@@ -678,7 +1726,7 @@ async function forceExitMatch(){
       const remaining=Object.values(game.players||{}).filter(x=>x.inMatch);
       if(remaining.length===0){
         resetToLobby(game);
-      }else if(remaining.every(x=>x.status!=="guessing")){
+      }else if(remaining.every(x=>safeStatus(x.status,"guessing")!=="guessing")){
         for(const x of remaining){
           if(!x.roundChampionId && x.championId) x.roundChampionId=x.championId;
         }
@@ -689,7 +1737,7 @@ async function forceExitMatch(){
     // 单轮结算 / 最终结算：保留其历史积分用于排行榜，
     // 但 offline + left 会让他无法被带入下一轮。
     if(phase==="roundEnd" || phase==="gameEnd"){
-      const anyoneOnline=Object.values(game.players||{}).some(x=>x.online);
+      const anyoneOnline=Object.values(game.players||{}).some(x=>x?.online===true);
       if(!anyoneOnline) resetToLobby(game);
     }
 
@@ -708,64 +1756,86 @@ async function forceExitMatch(){
 let initializeApp,getDatabase,ref,onValue,set,update,get,runTransaction,onDisconnect,remove;
 async function boot(){
   if(setupMissing()){
-    $("setupWarning").textContent="尚未配置 Firebase。请把 Firebase Web 配置粘贴到 index.html 顶部的 firebaseConfig。";
-    $("setupWarning").classList.remove("hidden");
-    $("joinForm").querySelector("button").disabled=true;
+    setBackendUnavailable("尚未配置 Firebase。请把 Firebase Web 配置粘贴到 index.html 顶部的 firebaseConfig。");
     return;
   }
+
   try{
     ({initializeApp}=await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js"));
     ({getDatabase,ref,onValue,set,update,get,runTransaction,onDisconnect,remove}=await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js"));
-    const app=initializeApp(firebaseConfig); db=getDatabase(app); gameRef=ref(db,ROOT);
+
+    const app=initializeApp(firebaseConfig);
+    db=getDatabase(app);
+    gameRef=ref(db,ROOT);
     meId=localStorage.getItem("lolGuessPlayerId")||uid();
     localStorage.setItem("lolGuessPlayerId",meId);
 
-    // 先检查 10 分钟全局无活动超时，再处理旧的废弃对局。
-    await checkInactivityTimeout();
+    backendAvailable=true;
 
-    // 如果上一场所有人都已经关闭网页，但数据库仍停留在结算/比赛中，
-    // 新访问者会自动恢复到大厅，不再出现“比赛一直在进行”。
+    // Check global inactivity before recovering stale sessions.
+    await checkInactivityTimeout();
     await recoverAbandonedGame();
 
     startInactivityWatcher();
+    clearBackendWarning();
 
-    onValue(gameRef,s=>{
-      currentGame=s.val()||{state:{phase:"lobby"},players:{}};
-      render();
-      configureDisconnectGuard(currentGame);
-      maybeCloseRound(currentGame);
-    });
+    onValue(
+      gameRef,
+      s=>{
+        currentGame=s.val()||{state:{phase:"lobby"},players:{}};
+        render();
+        configureDisconnectGuard(currentGame).catch(e=>console.warn("断线保护更新失败",e));
+        maybeCloseRound(currentGame).catch(e=>console.warn("回合状态检查失败",e));
+      },
+      e=>{
+        console.error("Firebase 实时监听失败",e);
+        setBackendUnavailable("Firebase 实时同步失败："+(e?.message||"未知错误"));
+      }
+    );
+
     const existing=await get(ref(db,`${ROOT}/players/${meId}`));
     if(existing.exists()){
-      const ep=existing.val();
+      const ep=existing.val()||{};
       const rootSnap=await get(gameRef);
       const phase=rootSnap.val()?.state?.phase||"lobby";
-      if(phase==="lobby" || ep.status!=="left"){
+      if(phase==="lobby" || safeStatus(ep.status,"lobby")!=="left"){
         await update(ref(db,`${ROOT}/players/${meId}`),{online:true});
       }
       disconnectMode="";
       await configureDisconnectGuard(currentGame);
     }
-    await loadChampions().catch(()=>{});
+
+    // Preload for a smoother first round, but failure here is non-fatal.
+    loadChampions()
+      .then(()=>{
+        if(currentGame) render();
+        if(!$("heroBrowserOverlay").classList.contains("hidden")) renderHeroBrowser();
+      })
+      .catch(e=>console.warn("英雄数据预加载失败",e));
   }catch(e){
-    $("setupWarning").textContent="连接 Firebase 失败："+e.message;
-    $("setupWarning").classList.remove("hidden");
+    console.error("Firebase 初始化失败",e);
+    setBackendUnavailable("连接 Firebase 失败："+(e?.message||"未知错误"));
   }
 }
 $("joinForm").addEventListener("submit",async e=>{
   e.preventDefault();
+  if(!backendAvailable || !db || !gameRef){
+    alert("后端尚未连接，请刷新页面后重试。");
+    return;
+  }
   const name=$("nameInput").value.trim();
   if(!name) return;
   const phase=currentGame?.state?.phase||"lobby";
   if(phase!=="lobby"){ alert("比赛已经开始，请等下一场。"); return; }
   explicitExitLocal=false;
   await set(ref(db,`${ROOT}/players/${meId}`),{
-    name:name.slice(0,16),online:true,inMatch:false,score:0,status:"lobby",championId:null,roundChampionId:null,joinedAt:Date.now()
+    name:Array.from(name).slice(0,16).join(""),online:true,inMatch:false,score:0,status:"lobby",championId:null,roundChampionId:null,notes:null,joinedAt:Date.now()
   });
   disconnectMode="";
   await configureDisconnectGuard(currentGame);
 });
 $("leaveBtn").addEventListener("click",async()=>{
+  if(!backendAvailable || !db || !gameRef) return;
   if(currentGame?.state?.phase!=="lobby") return;
   try{ if(disconnectHandle) await disconnectHandle.cancel(); }catch(e){}
   disconnectHandle=null; disconnectMode="";
@@ -774,11 +1844,62 @@ $("leaveBtn").addEventListener("click",async()=>{
   meId=uid(); localStorage.setItem("lolGuessPlayerId",meId);
   explicitExitLocal=false;
 });
-$("startBtn").addEventListener("click",()=>assignAndStartRound(true));
-$("nextRoundBtn").addEventListener("click",()=>assignAndStartRound(false));
-$("guessedBtn").addEventListener("click",()=>finishMe("guessed"));
+$("startBtn").addEventListener("click",()=>assignAndStartRound(true).catch(e=>console.error(e)));
+$("nextRoundBtn").addEventListener("click",()=>assignAndStartRound(false).catch(e=>console.error(e)));
+
+$("heroBrowseBtn").addEventListener("click",()=>openHeroBrowser());
+$("heroBrowserClose").addEventListener("click",closeHeroBrowser);
+$("heroBrowserOverlay").addEventListener("click",e=>{
+  if(e.target===$("heroBrowserOverlay")) closeHeroBrowser();
+});
+$("heroSearch").addEventListener("input",e=>{
+  heroBrowserQuery=e.target.value || "";
+  renderHeroBrowser();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && !$("heroBrowserOverlay").classList.contains("hidden")){
+    closeHeroBrowser();
+  }
+});
+
+$("noteForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const textValue=$("noteInput").value.trim().replace(/\s+/g," ");
+  if(!textValue || !db || !meId) return;
+
+  const me=currentGame?.players?.[meId];
+  if(currentGame?.state?.phase!=="playing" || me?.inMatch!==true || safeStatus(me.status,"guessing")!=="guessing") return;
+
+  // Keep notes lightweight and readable on mobile.
+  const existing=sortedNotes(me);
+  if(existing.length>=50){
+    alert("本轮最多记录 50 条笔记。");
+    return;
+  }
+
+  const noteId=uid();
+  $("addNoteBtn").disabled=true;
+  try{
+    await set(ref(db,`${ROOT}/players/${meId}/notes/${noteId}`),{
+      text:Array.from(textValue).slice(0,10).join(""),
+      createdAt:Date.now()
+    });
+    $("noteInput").value="";
+    touchActivity(false).catch(()=>{});
+  }catch(err){
+    console.warn("添加笔记失败",err);
+    alert("添加笔记失败，请重试。");
+  }finally{
+    const stillGuessing=currentGame?.state?.phase==="playing" &&
+      safeStatus(currentGame?.players?.[meId]?.status,"guessing")==="guessing";
+    $("addNoteBtn").disabled=!stillGuessing;
+    if(stillGuessing) $("noteInput").focus();
+  }
+});
+
+$("guessedBtn").addEventListener("click",()=>finishMe("guessed").catch(e=>{console.error(e);alert("提交结果失败，请重试。");}));
 $("giveUpBtn").addEventListener("click",()=>{
-  if(confirm("确定弃权？弃权后本轮 0 分，并显示你的英雄。")) finishMe("gaveup");
+  if(confirm("确定弃权？弃权后本轮 0 分，并显示你的英雄。")) finishMe("gaveup").catch(e=>{console.error(e);alert("弃权提交失败，请重试。");});
 });
 function confirmExit(){
   const phase=currentGame?.state?.phase||"lobby";
@@ -801,25 +1922,24 @@ $("restartBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
   if(!g) return g;
   g.state={phase:"lobby",round:0,finishCounter:0,participantCount:0,lastActivity:Date.now()};
   for(const p of Object.values(g.players||{})){
-    p.score=0;p.roundScore=0;p.status="lobby";p.inMatch=false;p.championId=null;p.roundChampionId=null;p.finishOrder=null;
+    p.score=0;p.roundScore=0;p.status="lobby";p.inMatch=false;p.championId=null;p.roundChampionId=null;p.notes=null;p.finishOrder=null;
   }
   return g;
 }));
 
-// 任意玩家实际操作网页都会刷新全局活动时间。
-// 30 秒节流，避免频繁写 Firebase。
-["pointerdown","keydown","touchstart"].forEach(evt=>{
+// Only current match participants refresh global activity.
+// pointerdown covers mouse / pen / touch on modern mobile browsers.
+["pointerdown","keydown"].forEach(evt=>{
   document.addEventListener(evt,()=>{
-    touchActivity(false).catch(()=>{});
+    touchActivity(false).catch(e=>console.warn("活动更新失败",e));
   },{passive:true});
 });
 
-// 从微信/手机后台重新回到页面时，先检查是否已经超过 10 分钟。
+// Returning from the background performs one guarded transaction:
+// expired matches reset instead of being resurrected.
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"){
-    checkInactivityTimeout()
-      .then(timedOut=>{ if(!timedOut) return touchActivity(true); })
-      .catch(()=>{});
+    touchActivity(true).catch(e=>console.warn("恢复活动检查失败",e));
   }
 });
 
