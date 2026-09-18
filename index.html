@@ -71,7 +71,7 @@
 <body>
 <main class="wrap">
   <h1>LOL 猜英雄</h1>
-  <p class="sub">连麦交流 · 只看别人头像 · 猜到越早得分越高</p>
+  <p class="sub">连麦交流 · 只看别人头像 · 猜到越早得分越高 · <span style="opacity:.65">v7</span></p>
 
   <div id="setupWarning" class="notice err hidden"></div>
 
@@ -282,6 +282,9 @@ async function removePlayer(targetId){
       if(remaining.length===0){
         resetToLobby(game);
       }else if(remaining.every(p=>p.status!=="guessing")){
+        for(const p of remaining){
+          if(!p.roundChampionId && p.championId) p.roundChampionId=p.championId;
+        }
         game.state.phase="roundEnd";
       }
 
@@ -362,6 +365,7 @@ function resetToLobby(game){
     p.inMatch=false;
     p.roundScore=0;
     p.championId=null;
+    p.roundChampionId=null;
     p.finishOrder=null;
   }
   return game;
@@ -433,6 +437,9 @@ async function maybeCloseRound(g=currentGame){
         if(!game || game.state?.phase!=="playing") return game;
         const live=Object.values(game.players||{}).filter(p=>p.inMatch);
         if(live.length && live.every(p=>p.status!=="guessing")){
+          for(const p of live){
+            if(!p.roundChampionId && p.championId) p.roundChampionId=p.championId;
+          }
           game.state.phase="roundEnd";
           game.state.lastActivity=Date.now();
         }
@@ -526,8 +533,9 @@ function render(){
     showView("roundEndView");
     const ps=rankPlayers(activePlayers(g));
     $("roundScores").innerHTML=ps.map(([id,p],i)=>{
-      const hero = p.championId
-        ? `<img class="roundHero" src="${heroUrl(p.championId)}" alt="${esc(p.name)}本轮英雄头像">`
+      const resultChampionId = p.roundChampionId || p.championId || null;
+      const hero = resultChampionId
+        ? `<img class="roundHero" data-round-hero src="${heroUrl(resultChampionId)}" alt="${esc(p.name)}本轮英雄头像">`
         : `<div class="roundHeroUnknown" aria-label="英雄未知">?</div>`;
       return `<div class="scoreRow roundScoreRow">
         <div>${i+1}</div>
@@ -544,6 +552,15 @@ function render(){
       </div>`;
     }).join("");
     bindRemoveButtons();
+    document.querySelectorAll("[data-round-hero]").forEach(img=>{
+      img.addEventListener("error",()=>{
+        const fallback=document.createElement("div");
+        fallback.className="roundHeroUnknown";
+        fallback.textContent="?";
+        fallback.setAttribute("aria-label","英雄头像加载失败");
+        img.replaceWith(fallback);
+      },{once:true});
+    });
     return;
   }
 
@@ -599,7 +616,9 @@ async function assignAndStartRound(isFirst){
       p.inMatch=participates;
       if(participates){
         if(isFirst) p.score=0;
-        p.championId=assignments[id] || pool[Math.floor(Math.random()*pool.length)];
+        const assignedChampion=assignments[id] || pool[Math.floor(Math.random()*pool.length)];
+        p.championId=assignedChampion;
+        p.roundChampionId=assignedChampion;
         p.status="guessing"; p.roundScore=0; p.finishOrder=null;
       }
     }
@@ -614,6 +633,8 @@ async function finishMe(kind){
 
     game.state.lastActivity=Date.now();
 
+    if(!p.roundChampionId && p.championId) p.roundChampionId=p.championId;
+
     if(kind==="guessed"){
       game.state.finishCounter=(game.state.finishCounter||0)+1;
       const order=game.state.finishCounter;
@@ -625,6 +646,9 @@ async function finishMe(kind){
     }
     const participants=Object.values(game.players||{}).filter(x=>x.inMatch);
     if(participants.length && participants.every(x=>x.status!=="guessing")){
+      for(const x of participants){
+        if(!x.roundChampionId && x.championId) x.roundChampionId=x.championId;
+      }
       game.state.phase="roundEnd";
     }
     return game;
@@ -655,6 +679,9 @@ async function forceExitMatch(){
       if(remaining.length===0){
         resetToLobby(game);
       }else if(remaining.every(x=>x.status!=="guessing")){
+        for(const x of remaining){
+          if(!x.roundChampionId && x.championId) x.roundChampionId=x.championId;
+        }
         game.state.phase="roundEnd";
       }
     }
@@ -733,7 +760,7 @@ $("joinForm").addEventListener("submit",async e=>{
   if(phase!=="lobby"){ alert("比赛已经开始，请等下一场。"); return; }
   explicitExitLocal=false;
   await set(ref(db,`${ROOT}/players/${meId}`),{
-    name:name.slice(0,16),online:true,inMatch:false,score:0,status:"lobby",joinedAt:Date.now()
+    name:name.slice(0,16),online:true,inMatch:false,score:0,status:"lobby",championId:null,roundChampionId:null,joinedAt:Date.now()
   });
   disconnectMode="";
   await configureDisconnectGuard(currentGame);
@@ -774,7 +801,7 @@ $("restartBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
   if(!g) return g;
   g.state={phase:"lobby",round:0,finishCounter:0,participantCount:0,lastActivity:Date.now()};
   for(const p of Object.values(g.players||{})){
-    p.score=0;p.roundScore=0;p.status="lobby";p.inMatch=false;p.championId=null;p.finishOrder=null;
+    p.score=0;p.roundScore=0;p.status="lobby";p.inMatch=false;p.championId=null;p.roundChampionId=null;p.finishOrder=null;
   }
   return g;
 }));
