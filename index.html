@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>LOL 猜英雄</title>
+  <style>
+    :root{
+      --bg:#0b1020;--panel:#121a2d;--panel2:#18223a;--line:#2a3655;
+      --text:#eef3ff;--muted:#9eabc5;--accent:#c89b3c;--danger:#d95454;--ok:#4fb879;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#09101d,#10182b);color:var(--text);
+      font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
+    button,input{font:inherit}
+    button{min-height:46px;border:0;border-radius:12px;padding:0 16px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .primary{background:var(--accent);color:#10131b}.secondary{background:#26324f;color:var(--text)}
+    .danger{background:var(--danger);color:white}.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+    .wrap{width:min(760px,100%);margin:auto;padding:18px 14px 40px}
+    h1{font-size:22px;margin:4px 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+    .card{background:rgba(18,26,45,.96);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+    input{width:100%;background:#0c1426;color:var(--text);border:1px solid var(--line);border-radius:12px;
+      padding:13px 14px;font-size:16px;outline:none}
+    input:focus{border-color:var(--accent)}
+    .hidden{display:none!important}
+    .players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .p{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}
+    .p.you{border-color:var(--accent)} .p.offline{opacity:.5}
+    .name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .meta{font-size:12px;color:var(--muted);margin-top:3px}
+    .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px}
+    .dot.off{background:#6a7181}
+    .heroGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .heroCard{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:center}
+    .heroPic{aspect-ratio:1/1;width:100%;object-fit:cover;display:block;background:#080d18}
+    .unknown{aspect-ratio:1/1;display:grid;place-items:center;font-size:64px;font-weight:900;
+      background:radial-gradient(circle,#273451,#0c1425)}
+    .heroFoot{padding:10px}.status{font-size:12px;color:var(--muted);margin-top:4px}
+    .tag{display:inline-block;padding:3px 8px;border-radius:999px;background:#26324f;font-size:12px}
+    .oktag{background:#153727;color:#9ee8bd}.outtag{background:#472425;color:#ffb0b0}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    .scoreRow{display:grid;grid-template-columns:42px 1fr 70px 70px;gap:8px;align-items:center;
+      padding:10px 0;border-bottom:1px solid var(--line)}
+    .scoreRow:last-child{border-bottom:0}.right{text-align:right}
+    .mvp{text-align:center;padding:22px 10px}.crown{font-size:52px}.mvpName{font-size:28px;font-weight:900}
+    .notice{padding:10px 12px;border-radius:10px;background:#262f45;color:#dce5f8;font-size:13px}
+    .err{background:#482227;color:#ffd4d4}.small{font-size:12px;color:var(--muted)}
+    .topscore{font-weight:800;color:#f5cf78}
+    @media(min-width:620px){.players{grid-template-columns:repeat(3,minmax(0,1fr))}.heroGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <h1>LOL 猜英雄</h1>
+  <p class="sub">连麦交流 · 只看别人头像 · 猜到越早得分越高</p>
+
+  <div id="setupWarning" class="notice err hidden"></div>
+
+  <section id="joinView" class="card">
+    <h2 style="margin-top:0;font-size:18px">加入游戏</h2>
+    <form id="joinForm">
+      <input id="nameInput" maxlength="16" placeholder="输入昵称" autocomplete="nickname" />
+      <button class="primary" style="width:100%;margin-top:10px" type="submit">加入</button>
+    </form>
+  </section>
+
+  <section id="lobbyView" class="hidden">
+    <div class="card">
+      <div class="row between">
+        <div><b>等待玩家</b><div class="small"><span id="onlineCount">0</span> 人在线</div></div>
+        <button id="leaveBtn" class="ghost" type="button">退出</button>
+      </div>
+      <div id="lobbyPlayers" class="players" style="margin-top:14px"></div>
+      <button id="startBtn" class="primary" style="width:100%;margin-top:14px" type="button">开始比赛</button>
+      <div class="small" style="margin-top:8px">至少 2 人。任何玩家都可开始。</div>
+    </div>
+  </section>
+
+  <section id="gameView" class="hidden">
+    <div class="row between" style="margin:8px 2px">
+      <b>第 <span id="roundNo">1</span> 轮</b>
+      <span class="tag">总分 <span id="myScore">0</span></span>
+    </div>
+    <div id="heroGrid" class="heroGrid"></div>
+    <div id="myControls" class="card">
+      <div id="myStateText" style="text-align:center;font-weight:800">你的英雄：？？？</div>
+      <div class="actions">
+        <button id="guessedBtn" class="primary" type="button">我猜到了</button>
+        <button id="giveUpBtn" class="danger" type="button">弃权</button>
+      </div>
+      <div id="revealBox" class="hidden" style="margin-top:12px;text-align:center">
+        <div class="small">你的英雄</div>
+        <img id="revealImg" alt="你的英雄头像" style="width:120px;height:120px;border-radius:14px;margin-top:8px;object-fit:cover">
+      </div>
+    </div>
+  </section>
+
+  <section id="roundEndView" class="hidden">
+    <div class="card">
+      <h2 style="margin:0 0 12px;font-size:20px">本轮结束</h2>
+      <div id="roundScores"></div>
+      <div class="actions">
+        <button id="nextRoundBtn" class="primary" type="button">开启下一轮</button>
+        <button id="endGameBtn" class="secondary" type="button">结束比赛</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="finalView" class="hidden">
+    <div class="card">
+      <div id="mvpBox" class="mvp"></div>
+      <h3>最终排名</h3>
+      <div id="finalScores"></div>
+      <button id="restartBtn" class="primary" style="width:100%;margin-top:16px" type="button">重新开始</button>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+/* ===========================
+   1) 把你的 Firebase 配置粘贴这里
+   =========================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCoYutRKPa8XdHMRPmW0lmWGgU5lbU2ziU",
+  authDomain: "lol-guess-game.firebaseapp.com",
+  databaseURL: "https://lol-guess-game-default-rtdb.firebaseio.com",
+  projectId: "lol-guess-game",
+  storageBucket: "lol-guess-game.firebasestorage.app",
+  messagingSenderId: "532402577225",
+  appId: "1:532402577225:web:2778c0d71970e44946c498"
+};
+
+const ROOT = "lolGuessGame";
+const $ = id => document.getElementById(id);
+const views = ["joinView","lobbyView","gameView","roundEndView","finalView"];
+let db, gameRef, meId, currentGame = null;
+let ddragonVersion = null, champions = [];
+
+function showView(id){
+  views.forEach(v => $(v).classList.toggle("hidden", v !== id));
+}
+function uid(){
+  return (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36));
+}
+function esc(s=""){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function setupMissing(){
+  return Object.values(firebaseConfig).some(v => !v || v==="PASTE_HERE");
+}
+function heroUrl(champId){
+  if(!ddragonVersion || !champId) return "";
+  return `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/champion/${champId}.png`;
+}
+async function loadChampions(){
+  const versions = await fetch("https://ddragon.leagueoflegends.com/api/versions.json").then(r=>r.json());
+  ddragonVersion = versions[0];
+  const data = await fetch(`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/data/en_US/champion.json`).then(r=>r.json());
+  champions = Object.values(data.data).map(c => c.id);
+}
+function shuffle(a){
+  a=[...a];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function activePlayers(g=currentGame){
+  return Object.entries(g?.players||{}).filter(([,p])=>p.inMatch);
+}
+function allOnlinePlayers(g=currentGame){
+  return Object.entries(g?.players||{}).filter(([,p])=>p.online);
+}
+function rankPlayers(entries){
+  return [...entries].sort((a,b)=>(b[1].score||0)-(a[1].score||0) || (a[1].joinedAt||0)-(b[1].joinedAt||0));
+}
+function render(){
+  const g=currentGame;
+  if(!g){ showView("joinView"); return; }
+  const me=g.players?.[meId];
+
+  if(!me){
+    showView("joinView"); return;
+  }
+  const phase=g.state?.phase||"lobby";
+
+  if(phase==="lobby"){
+    showView("lobbyView");
+    const ps=allOnlinePlayers(g);
+    $("onlineCount").textContent=ps.length;
+    $("lobbyPlayers").innerHTML=ps.map(([id,p])=>`
+      <div class="p ${id===meId?"you":""}">
+        <div class="name"><span class="dot"></span>${esc(p.name)}${id===meId?"（你）":""}</div>
+        <div class="meta">已加入</div>
+      </div>`).join("");
+    $("startBtn").disabled=ps.length<2;
+    return;
+  }
+
+  if(phase==="playing"){
+    showView("gameView");
+    $("roundNo").textContent=g.state.round||1;
+    $("myScore").textContent=me.score||0;
+    const participants=activePlayers(g);
+    $("heroGrid").innerHTML=participants.map(([id,p])=>{
+      const isMe=id===meId;
+      const canSee = !isMe || p.status!=="guessing";
+      let media;
+      if(canSee && p.championId){
+        media=`<img class="heroPic" src="${heroUrl(p.championId)}" alt="英雄头像">`;
+      } else {
+        media=`<div class="unknown" aria-label="未知英雄">?</div>`;
+      }
+      let stat = p.status==="guessed" ? `<span class="tag oktag">已猜到 +${p.roundScore||0}</span>`
+               : p.status==="gaveup" ? `<span class="tag outtag">已弃权 +0</span>`
+               : `<span class="tag">猜测中</span>`;
+      return `<div class="heroCard ${isMe?"you":""}">
+        ${media}
+        <div class="heroFoot">
+          <div class="name">${esc(p.name)}${isMe?"（你）":""}</div>
+          <div class="status">${stat}</div>
+        </div>
+      </div>`;
+    }).join("");
+
+    const done=me.status!=="guessing";
+    $("guessedBtn").disabled=done;
+    $("giveUpBtn").disabled=done;
+    $("myStateText").textContent =
+      me.status==="guessed" ? `已猜到，本轮 +${me.roundScore||0}`
+      : me.status==="gaveup" ? "已弃权，本轮 +0"
+      : "你的英雄：？？？";
+    if(done && me.championId){
+      $("revealBox").classList.remove("hidden");
+      $("revealImg").src=heroUrl(me.championId);
+    }else{
+      $("revealBox").classList.add("hidden");
+    }
+    return;
+  }
+
+  if(phase==="roundEnd"){
+    showView("roundEndView");
+    const ps=rankPlayers(activePlayers(g));
+    $("roundScores").innerHTML=ps.map(([id,p],i)=>`
+      <div class="scoreRow">
+        <div>${i+1}</div>
+        <div class="name">${esc(p.name)}${id===meId?"（你）":""}<div class="small">${p.status==="gaveup"?"弃权":"完成"}</div></div>
+        <div class="right">+${p.roundScore||0}</div>
+        <div class="right topscore">${p.score||0}</div>
+      </div>`).join("");
+    return;
+  }
+
+  if(phase==="gameEnd"){
+    showView("finalView");
+    const ps=rankPlayers(activePlayers(g));
+    const max=ps.length ? (ps[0][1].score||0) : 0;
+    const mvps=ps.filter(([,p])=>(p.score||0)===max).map(([,p])=>p.name);
+    $("mvpBox").innerHTML=`<div class="crown">🏆</div><div class="small">MVP</div>
+      <div class="mvpName">${esc(mvps.join(" & "))}</div><div class="topscore">${max} 分</div>`;
+    $("finalScores").innerHTML=ps.map(([id,p],i)=>`
+      <div class="scoreRow">
+        <div>${i+1}</div><div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
+        <div></div><div class="right topscore">${p.score||0}</div>
+      </div>`).join("");
+  }
+}
+async function assignAndStartRound(isFirst){
+  if(champions.length===0) await loadChampions();
+  const snap = await get(gameRef);
+  const g=snap.val()||{};
+  const eligible=Object.entries(g.players||{}).filter(([,p])=>isFirst ? p.online : p.inMatch);
+  if(eligible.length<2){ alert("至少需要 2 名玩家。"); return; }
+  const pool=shuffle(champions);
+  const assignments={};
+  eligible.forEach(([id],i)=>assignments[id]=pool[i%pool.length]);
+
+  await runTransaction(gameRef, game=>{
+    if(!game) return game;
+    const phase=game.state?.phase||"lobby";
+    if(isFirst && phase!=="lobby") return;
+    if(!isFirst && phase!=="roundEnd") return;
+    const liveIds=Object.entries(game.players||{})
+      .filter(([,p])=>isFirst ? p.online : p.inMatch).map(([id])=>id);
+    if(liveIds.length<2) return;
+    const nextRound=isFirst?1:(game.state.round||1)+1;
+    game.state={phase:"playing",round:nextRound,finishCounter:0,participantCount:liveIds.length};
+    for(const [id,p] of Object.entries(game.players||{})){
+      const participates=liveIds.includes(id);
+      p.inMatch=participates;
+      if(participates){
+        if(isFirst) p.score=0;
+        p.championId=assignments[id] || pool[Math.floor(Math.random()*pool.length)];
+        p.status="guessing"; p.roundScore=0; p.finishOrder=null;
+      }
+    }
+    return game;
+  });
+}
+async function finishMe(kind){
+  await runTransaction(gameRef, game=>{
+    if(!game || game.state?.phase!=="playing") return game;
+    const p=game.players?.[meId];
+    if(!p || !p.inMatch || p.status!=="guessing") return game;
+
+    if(kind==="guessed"){
+      game.state.finishCounter=(game.state.finishCounter||0)+1;
+      const order=game.state.finishCounter;
+      const n=game.state.participantCount||1;
+      const points=Math.max(1,n-order+1);
+      p.status="guessed"; p.finishOrder=order; p.roundScore=points; p.score=(p.score||0)+points;
+    }else{
+      p.status="gaveup"; p.finishOrder=null; p.roundScore=0;
+    }
+    const participants=Object.values(game.players||{}).filter(x=>x.inMatch);
+    if(participants.length && participants.every(x=>x.status!=="guessing")){
+      game.state.phase="roundEnd";
+    }
+    return game;
+  });
+}
+
+/* Firebase boot */
+let initializeApp,getDatabase,ref,onValue,set,update,get,runTransaction,onDisconnect,remove;
+async function boot(){
+  if(setupMissing()){
+    $("setupWarning").textContent="尚未配置 Firebase。请把 Firebase Web 配置粘贴到 index.html 顶部的 firebaseConfig。";
+    $("setupWarning").classList.remove("hidden");
+    $("joinForm").querySelector("button").disabled=true;
+    return;
+  }
+  try{
+    ({initializeApp}=await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js"));
+    ({getDatabase,ref,onValue,set,update,get,runTransaction,onDisconnect,remove}=await import("https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js"));
+    const app=initializeApp(firebaseConfig); db=getDatabase(app); gameRef=ref(db,ROOT);
+    meId=localStorage.getItem("lolGuessPlayerId")||uid();
+    localStorage.setItem("lolGuessPlayerId",meId);
+    onValue(gameRef,s=>{currentGame=s.val()||{state:{phase:"lobby"},players:{}};render();});
+    const existing=await get(ref(db,`${ROOT}/players/${meId}`));
+    if(existing.exists()){
+      await update(ref(db,`${ROOT}/players/${meId}`),{online:true});
+      onDisconnect(ref(db,`${ROOT}/players/${meId}/online`)).set(false);
+    }
+    await loadChampions().catch(()=>{});
+  }catch(e){
+    $("setupWarning").textContent="连接 Firebase 失败："+e.message;
+    $("setupWarning").classList.remove("hidden");
+  }
+}
+$("joinForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const name=$("nameInput").value.trim();
+  if(!name) return;
+  const phase=currentGame?.state?.phase||"lobby";
+  if(phase!=="lobby"){ alert("比赛已经开始，请等下一场。"); return; }
+  await set(ref(db,`${ROOT}/players/${meId}`),{
+    name:name.slice(0,16),online:true,inMatch:false,score:0,status:"lobby",joinedAt:Date.now()
+  });
+  onDisconnect(ref(db,`${ROOT}/players/${meId}/online`)).set(false);
+});
+$("leaveBtn").addEventListener("click",async()=>{
+  if(currentGame?.state?.phase!=="lobby") return;
+  await remove(ref(db,`${ROOT}/players/${meId}`));
+  localStorage.removeItem("lolGuessPlayerId");
+  meId=uid(); localStorage.setItem("lolGuessPlayerId",meId);
+});
+$("startBtn").addEventListener("click",()=>assignAndStartRound(true));
+$("nextRoundBtn").addEventListener("click",()=>assignAndStartRound(false));
+$("guessedBtn").addEventListener("click",()=>finishMe("guessed"));
+$("giveUpBtn").addEventListener("click",()=>{
+  if(confirm("确定弃权？弃权后本轮 0 分，并显示你的英雄。")) finishMe("gaveup");
+});
+$("endGameBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
+  if(g?.state?.phase==="roundEnd") g.state.phase="gameEnd"; return g;
+}));
+$("restartBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
+  if(!g) return g;
+  g.state={phase:"lobby",round:0,finishCounter:0,participantCount:0};
+  for(const p of Object.values(g.players||{})){
+    p.score=0;p.roundScore=0;p.status="lobby";p.inMatch=false;p.championId=null;p.finishOrder=null;
+  }
+  return g;
+}));
+boot();
+</script>
+</body>
+</html>
