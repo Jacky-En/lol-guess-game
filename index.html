@@ -48,6 +48,11 @@
     .notice{padding:10px 12px;border-radius:10px;background:#262f45;color:#dce5f8;font-size:13px}
     .err{background:#482227;color:#ffd4d4}.small{font-size:12px;color:var(--muted)}
     .topscore{font-weight:800;color:#f5cf78}
+    .removeBtn{min-height:34px;padding:0 9px;border-radius:9px;background:transparent;
+      color:#d9a2a2;border:1px solid #5a3940;font-size:12px;font-weight:700}
+    .removeBtn.confirming{background:#6a2f38;color:#fff;border-color:#8c3e49}
+    .playerHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .playerHead .name{min-width:0;flex:1}
     .gameTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 2px}
     .gameTopRight{display:flex;align-items:center;gap:8px}
     .closeGame{width:42px;min-width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;
@@ -111,13 +116,16 @@
     <div class="card exitBox">
       <div class="exitMark">×</div>
       <h2 style="margin:0 0 8px;font-size:20px">已退出本场比赛</h2>
-      <div class="small">你不会再影响本轮进度。可以关闭此页面；下一场比赛开始前重新打开即可再次加入。</div>
+      <div class="small">你已经离开当前比赛，不会再阻塞其他玩家。可以直接关闭此页面。</div>
     </div>
   </section>
 
   <section id="roundEndView" class="hidden">
     <div class="card">
-      <h2 style="margin:0 0 12px;font-size:20px">本轮结束</h2>
+      <div class="gameTop" style="margin:0 0 12px">
+        <h2 style="margin:0;font-size:20px">本轮结束</h2>
+        <button id="roundExitBtn" class="closeGame" type="button" aria-label="退出本场比赛" title="退出本场比赛">×</button>
+      </div>
       <div id="roundScores"></div>
       <div class="actions">
         <button id="nextRoundBtn" class="primary" type="button">开启下一轮</button>
@@ -128,6 +136,10 @@
 
   <section id="finalView" class="hidden">
     <div class="card">
+      <div class="gameTop" style="margin:0 0 4px">
+        <div class="small">比赛结算</div>
+        <button id="finalExitBtn" class="closeGame" type="button" aria-label="退出比赛结算" title="退出比赛结算">×</button>
+      </div>
       <div id="mvpBox" class="mvp"></div>
       <h3>最终排名</h3>
       <div id="finalScores"></div>
@@ -157,6 +169,12 @@ let db, gameRef, meId, currentGame = null;
 let disconnectHandle = null;
 let disconnectMode = "";
 let closingRound = false;
+let explicitExitLocal = false;
+
+const INACTIVITY_LIMIT_MS = 10 * 60 * 1000;   // 10 分钟
+const ACTIVITY_WRITE_THROTTLE_MS = 30 * 1000; // 最多每 30 秒写一次活动时间
+let lastActivityWrite = 0;
+let inactivityTimer = null;
 let ddragonVersion = null, champions = [];
 
 function showView(id){
@@ -196,6 +214,164 @@ function allOnlinePlayers(g=currentGame){
 }
 function rankPlayers(entries){
   return [...entries].sort((a,b)=>(b[1].score||0)-(a[1].score||0) || (a[1].joinedAt||0)-(b[1].joinedAt||0));
+}
+
+const removeConfirmTimers = new Map();
+
+function removeButtonHtml(id){
+  if(id===meId) return "";
+  return `<button type="button" class="removeBtn" data-remove-player="${id}">移除</button>`;
+}
+
+function bindRemoveButtons(){
+  document.querySelectorAll("[data-remove-player]").forEach(btn=>{
+    if(btn.dataset.bound==="1") return;
+    btn.dataset.bound="1";
+
+    btn.addEventListener("click", async ()=>{
+      const targetId=btn.dataset.removePlayer;
+      if(!targetId || targetId===meId) return;
+
+      if(btn.dataset.confirming!=="1"){
+        btn.dataset.confirming="1";
+        btn.classList.add("confirming");
+        btn.textContent="再次点击确认";
+
+        if(removeConfirmTimers.has(targetId)){
+          clearTimeout(removeConfirmTimers.get(targetId));
+        }
+        const timer=setTimeout(()=>{
+          btn.dataset.confirming="0";
+          btn.classList.remove("confirming");
+          btn.textContent="移除";
+          removeConfirmTimers.delete(targetId);
+        },3000);
+        removeConfirmTimers.set(targetId,timer);
+        return;
+      }
+
+      if(removeConfirmTimers.has(targetId)){
+        clearTimeout(removeConfirmTimers.get(targetId));
+        removeConfirmTimers.delete(targetId);
+      }
+      btn.disabled=true;
+      btn.textContent="移除中…";
+      await removePlayer(targetId);
+    });
+  });
+}
+
+async function removePlayer(targetId){
+  if(!targetId || targetId===meId) return;
+
+  await runTransaction(gameRef,game=>{
+    if(!game?.players?.[targetId]) return game;
+
+    const phase=game.state?.phase||"lobby";
+    if(phase!=="lobby") game.state.lastActivity=Date.now();
+    delete game.players[targetId];
+
+    if(phase==="playing"){
+      const remaining=Object.values(game.players||{}).filter(p=>p.inMatch);
+
+      if(remaining.length===0){
+        resetToLobby(game);
+      }else if(remaining.every(p=>p.status!=="guessing")){
+        game.state.phase="roundEnd";
+      }
+
+      // participantCount 保留开局人数，避免有人被移除后改变已经确定的计分基准。
+    }
+
+    if(phase==="roundEnd" || phase==="gameEnd"){
+      const remainingPlayers=Object.values(game.players||{});
+      if(remainingPlayers.length===0){
+        resetToLobby(game);
+      }
+    }
+
+    return game;
+  });
+}
+
+async function touchActivity(force=false){
+  if(!db || !currentGame) return;
+  const phase=currentGame.state?.phase||"lobby";
+  if(phase==="lobby") return;
+
+  const now=Date.now();
+
+  // 先检查是否已经超过 10 分钟；若已超时，不允许一次新的点击把旧对局“复活”。
+  const timedOut = await checkInactivityTimeout();
+  if(timedOut) return;
+
+  if(!force && now-lastActivityWrite < ACTIVITY_WRITE_THROTTLE_MS) return;
+  lastActivityWrite=now;
+
+  try{
+    await set(ref(db,`${ROOT}/state/lastActivity`),now);
+  }catch(e){
+    console.warn("活动时间更新失败",e);
+  }
+}
+
+async function checkInactivityTimeout(){
+  if(!gameRef) return false;
+  const now=Date.now();
+  let timedOut=false;
+
+  await runTransaction(gameRef,game=>{
+    if(!game) return game;
+    const phase=game.state?.phase||"lobby";
+    if(phase==="lobby") return game;
+
+    const last=Number(game.state?.lastActivity||0);
+
+    // 旧版本没有 lastActivity 时，从现在开始计时，避免升级后立刻结束旧对局。
+    if(!last){
+      game.state.lastActivity=now;
+      return game;
+    }
+
+    if(now-last >= INACTIVITY_LIMIT_MS){
+      resetToLobby(game);
+      timedOut=true;
+    }
+    return game;
+  });
+
+  return timedOut;
+}
+
+function startInactivityWatcher(){
+  if(inactivityTimer) clearInterval(inactivityTimer);
+  inactivityTimer=setInterval(()=>{
+    checkInactivityTimeout().catch(e=>console.warn("超时检查失败",e));
+  },30000);
+}
+
+function resetToLobby(game){
+  game.state={phase:"lobby",round:0,finishCounter:0,participantCount:0,lastActivity:Date.now()};
+  for(const p of Object.values(game.players||{})){
+    p.status="lobby";
+    p.inMatch=false;
+    p.roundScore=0;
+    p.championId=null;
+    p.finishOrder=null;
+  }
+  return game;
+}
+
+async function recoverAbandonedGame(){
+  await runTransaction(gameRef,game=>{
+    if(!game) return game;
+    const phase=game.state?.phase||"lobby";
+    if(phase==="lobby") return game;
+
+    const anyoneOnline=Object.values(game.players||{}).some(p=>p.online);
+    if(!anyoneOnline) resetToLobby(game);
+    return game;
+  });
 }
 
 async function configureDisconnectGuard(g=currentGame){
@@ -238,10 +414,7 @@ async function maybeCloseRound(g=currentGame){
         if(!game || game.state?.phase!=="playing") return game;
         const live=Object.values(game.players||{}).filter(p=>p.inMatch);
         if(live.length!==0) return game;
-        game.state={phase:"lobby",round:0,finishCounter:0,participantCount:0};
-        for(const p of Object.values(game.players||{})){
-          p.status="lobby"; p.inMatch=false; p.roundScore=0; p.championId=null; p.finishOrder=null;
-        }
+        resetToLobby(game);
         return game;
       });
     }finally{ closingRound=false; }
@@ -254,7 +427,10 @@ async function maybeCloseRound(g=currentGame){
       await runTransaction(gameRef,game=>{
         if(!game || game.state?.phase!=="playing") return game;
         const live=Object.values(game.players||{}).filter(p=>p.inMatch);
-        if(live.length && live.every(p=>p.status!=="guessing")) game.state.phase="roundEnd";
+        if(live.length && live.every(p=>p.status!=="guessing")){
+          game.state.phase="roundEnd";
+          game.state.lastActivity=Date.now();
+        }
         return game;
       });
     }finally{ closingRound=false; }
@@ -267,11 +443,13 @@ function render(){
   const me=g.players?.[meId];
 
   if(!me){
-    showView("joinView"); return;
+    explicitExitLocal=false;
+    showView("joinView");
+    return;
   }
   const phase=g.state?.phase||"lobby";
 
-  if(phase!=="lobby" && me.status==="left" && !me.inMatch){
+  if(explicitExitLocal || (phase!=="lobby" && me.status==="left")){
     showView("exitView");
     return;
   }
@@ -282,9 +460,13 @@ function render(){
     $("onlineCount").textContent=ps.length;
     $("lobbyPlayers").innerHTML=ps.map(([id,p])=>`
       <div class="p ${id===meId?"you":""}">
-        <div class="name"><span class="dot"></span>${esc(p.name)}${id===meId?"（你）":""}</div>
+        <div class="playerHead">
+          <div class="name"><span class="dot"></span>${esc(p.name)}${id===meId?"（你）":""}</div>
+          ${removeButtonHtml(id)}
+        </div>
         <div class="meta">已加入</div>
       </div>`).join("");
+    bindRemoveButtons();
     $("startBtn").disabled=ps.length<2;
     return;
   }
@@ -309,11 +491,15 @@ function render(){
       return `<div class="heroCard ${isMe?"you":""}">
         ${media}
         <div class="heroFoot">
-          <div class="name">${esc(p.name)}${isMe?"（你）":""}</div>
+          <div class="playerHead">
+            <div class="name">${esc(p.name)}${isMe?"（你）":""}</div>
+            ${removeButtonHtml(id)}
+          </div>
           <div class="status">${stat}</div>
         </div>
       </div>`;
     }).join("");
+    bindRemoveButtons();
 
     const done=me.status!=="guessing";
     $("guessedBtn").disabled=done;
@@ -337,10 +523,17 @@ function render(){
     $("roundScores").innerHTML=ps.map(([id,p],i)=>`
       <div class="scoreRow">
         <div>${i+1}</div>
-        <div class="name">${esc(p.name)}${id===meId?"（你）":""}<div class="small">${p.status==="gaveup"?"弃权":"完成"}</div></div>
+        <div>
+          <div class="playerHead">
+            <div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
+            ${removeButtonHtml(id)}
+          </div>
+          <div class="small">${p.status==="gaveup"?"弃权":"完成"}</div>
+        </div>
         <div class="right">+${p.roundScore||0}</div>
         <div class="right topscore">${p.score||0}</div>
       </div>`).join("");
+    bindRemoveButtons();
     return;
   }
 
@@ -353,16 +546,23 @@ function render(){
       <div class="mvpName">${esc(mvps.join(" & "))}</div><div class="topscore">${max} 分</div>`;
     $("finalScores").innerHTML=ps.map(([id,p],i)=>`
       <div class="scoreRow">
-        <div>${i+1}</div><div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
+        <div>${i+1}</div>
+        <div class="playerHead">
+          <div class="name">${esc(p.name)}${id===meId?"（你）":""}</div>
+          ${removeButtonHtml(id)}
+        </div>
         <div></div><div class="right topscore">${p.score||0}</div>
       </div>`).join("");
+    bindRemoveButtons();
   }
 }
 async function assignAndStartRound(isFirst){
   if(champions.length===0) await loadChampions();
   const snap = await get(gameRef);
   const g=snap.val()||{};
-  const eligible=Object.entries(g.players||{}).filter(([,p])=>isFirst ? p.online : p.inMatch);
+  const eligible=Object.entries(g.players||{}).filter(([,p])=>
+    isFirst ? p.online : (p.inMatch && p.online && p.status!=="left")
+  );
   if(eligible.length<2){ alert("至少需要 2 名玩家。"); return; }
   const pool=shuffle(champions);
   const assignments={};
@@ -374,10 +574,16 @@ async function assignAndStartRound(isFirst){
     if(isFirst && phase!=="lobby") return;
     if(!isFirst && phase!=="roundEnd") return;
     const liveIds=Object.entries(game.players||{})
-      .filter(([,p])=>isFirst ? p.online : p.inMatch).map(([id])=>id);
+      .filter(([,p])=>isFirst ? p.online : (p.inMatch && p.online && p.status!=="left")).map(([id])=>id);
     if(liveIds.length<2) return;
     const nextRound=isFirst?1:(game.state.round||1)+1;
-    game.state={phase:"playing",round:nextRound,finishCounter:0,participantCount:liveIds.length};
+    game.state={
+      phase:"playing",
+      round:nextRound,
+      finishCounter:0,
+      participantCount:liveIds.length,
+      lastActivity:Date.now()
+    };
     for(const [id,p] of Object.entries(game.players||{})){
       const participates=liveIds.includes(id);
       p.inMatch=participates;
@@ -395,6 +601,8 @@ async function finishMe(kind){
     if(!game || game.state?.phase!=="playing") return game;
     const p=game.players?.[meId];
     if(!p || !p.inMatch || p.status!=="guessing") return game;
+
+    game.state.lastActivity=Date.now();
 
     if(kind==="guessed"){
       game.state.finishCounter=(game.state.finishCounter||0)+1;
@@ -414,30 +622,40 @@ async function finishMe(kind){
 }
 
 async function forceExitMatch(){
+  explicitExitLocal=true;
+
   await runTransaction(gameRef,game=>{
     if(!game) return game;
     const p=game.players?.[meId];
     if(!p) return game;
 
+    const phase=game.state?.phase||"lobby";
+    if(phase!=="lobby") game.state.lastActivity=Date.now();
     p.online=false;
-    p.inMatch=false;
     p.status="left";
-    p.roundScore=0;
-    p.finishOrder=null;
-    p.championId=null;
 
-    if(game.state?.phase==="playing"){
+    // 游戏进行中：立即移出本轮，避免阻塞其他玩家。
+    if(phase==="playing"){
+      p.inMatch=false;
+      p.roundScore=0;
+      p.finishOrder=null;
+      p.championId=null;
+
       const remaining=Object.values(game.players||{}).filter(x=>x.inMatch);
       if(remaining.length===0){
-        game.state={phase:"lobby",round:0,finishCounter:0,participantCount:0};
-        for(const other of Object.values(game.players||{})){
-          other.status="lobby"; other.inMatch=false; other.roundScore=0;
-          other.championId=null; other.finishOrder=null;
-        }
+        resetToLobby(game);
       }else if(remaining.every(x=>x.status!=="guessing")){
         game.state.phase="roundEnd";
       }
     }
+
+    // 单轮结算 / 最终结算：保留其历史积分用于排行榜，
+    // 但 offline + left 会让他无法被带入下一轮。
+    if(phase==="roundEnd" || phase==="gameEnd"){
+      const anyoneOnline=Object.values(game.players||{}).some(x=>x.online);
+      if(!anyoneOnline) resetToLobby(game);
+    }
+
     return game;
   });
 
@@ -446,6 +664,7 @@ async function forceExitMatch(){
   }catch(e){}
   disconnectHandle=null;
   disconnectMode="";
+  render();
 }
 
 /* Firebase boot */
@@ -463,6 +682,16 @@ async function boot(){
     const app=initializeApp(firebaseConfig); db=getDatabase(app); gameRef=ref(db,ROOT);
     meId=localStorage.getItem("lolGuessPlayerId")||uid();
     localStorage.setItem("lolGuessPlayerId",meId);
+
+    // 先检查 10 分钟全局无活动超时，再处理旧的废弃对局。
+    await checkInactivityTimeout();
+
+    // 如果上一场所有人都已经关闭网页，但数据库仍停留在结算/比赛中，
+    // 新访问者会自动恢复到大厅，不再出现“比赛一直在进行”。
+    await recoverAbandonedGame();
+
+    startInactivityWatcher();
+
     onValue(gameRef,s=>{
       currentGame=s.val()||{state:{phase:"lobby"},players:{}};
       render();
@@ -471,7 +700,12 @@ async function boot(){
     });
     const existing=await get(ref(db,`${ROOT}/players/${meId}`));
     if(existing.exists()){
-      await update(ref(db,`${ROOT}/players/${meId}`),{online:true});
+      const ep=existing.val();
+      const rootSnap=await get(gameRef);
+      const phase=rootSnap.val()?.state?.phase||"lobby";
+      if(phase==="lobby" || ep.status!=="left"){
+        await update(ref(db,`${ROOT}/players/${meId}`),{online:true});
+      }
       disconnectMode="";
       await configureDisconnectGuard(currentGame);
     }
@@ -487,6 +721,7 @@ $("joinForm").addEventListener("submit",async e=>{
   if(!name) return;
   const phase=currentGame?.state?.phase||"lobby";
   if(phase!=="lobby"){ alert("比赛已经开始，请等下一场。"); return; }
+  explicitExitLocal=false;
   await set(ref(db,`${ROOT}/players/${meId}`),{
     name:name.slice(0,16),online:true,inMatch:false,score:0,status:"lobby",joinedAt:Date.now()
   });
@@ -500,6 +735,7 @@ $("leaveBtn").addEventListener("click",async()=>{
   await remove(ref(db,`${ROOT}/players/${meId}`));
   localStorage.removeItem("lolGuessPlayerId");
   meId=uid(); localStorage.setItem("lolGuessPlayerId",meId);
+  explicitExitLocal=false;
 });
 $("startBtn").addEventListener("click",()=>assignAndStartRound(true));
 $("nextRoundBtn").addEventListener("click",()=>assignAndStartRound(false));
@@ -507,22 +743,49 @@ $("guessedBtn").addEventListener("click",()=>finishMe("guessed"));
 $("giveUpBtn").addEventListener("click",()=>{
   if(confirm("确定弃权？弃权后本轮 0 分，并显示你的英雄。")) finishMe("gaveup");
 });
-$("forceExitBtn").addEventListener("click",()=>{
-  if(confirm("确定退出本场比赛？\n\n退出后你将从本场比赛中移除，其他玩家可以继续进行。")){
-    forceExitMatch();
-  }
-});
+function confirmExit(){
+  const phase=currentGame?.state?.phase||"lobby";
+  const msg = phase==="playing"
+    ? "确定退出本场比赛？\n\n退出后你会立即离开本轮，其他玩家可以继续进行。"
+    : "确定退出本场比赛？\n\n你的历史积分会保留在当前结算中，但你不会进入下一轮。";
+  if(confirm(msg)) forceExitMatch();
+}
+$("forceExitBtn").addEventListener("click",confirmExit);
+$("roundExitBtn").addEventListener("click",confirmExit);
+$("finalExitBtn").addEventListener("click",confirmExit);
 $("endGameBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
-  if(g?.state?.phase==="roundEnd") g.state.phase="gameEnd"; return g;
+  if(g?.state?.phase==="roundEnd"){
+    g.state.phase="gameEnd";
+    g.state.lastActivity=Date.now();
+  }
+  return g;
 }));
 $("restartBtn").addEventListener("click",()=>runTransaction(gameRef,g=>{
   if(!g) return g;
-  g.state={phase:"lobby",round:0,finishCounter:0,participantCount:0};
+  g.state={phase:"lobby",round:0,finishCounter:0,participantCount:0,lastActivity:Date.now()};
   for(const p of Object.values(g.players||{})){
     p.score=0;p.roundScore=0;p.status="lobby";p.inMatch=false;p.championId=null;p.finishOrder=null;
   }
   return g;
 }));
+
+// 任意玩家实际操作网页都会刷新全局活动时间。
+// 30 秒节流，避免频繁写 Firebase。
+["pointerdown","keydown","touchstart"].forEach(evt=>{
+  document.addEventListener(evt,()=>{
+    touchActivity(false).catch(()=>{});
+  },{passive:true});
+});
+
+// 从微信/手机后台重新回到页面时，先检查是否已经超过 10 分钟。
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){
+    checkInactivityTimeout()
+      .then(timedOut=>{ if(!timedOut) return touchActivity(true); })
+      .catch(()=>{});
+  }
+});
+
 boot();
 </script>
 </body>
